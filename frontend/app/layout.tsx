@@ -1,0 +1,41 @@
+import type { Metadata } from "next";
+import { Inter, Outfit } from "next/font/google";
+import "./globals.css";
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+export const metadata: Metadata = {
+  title: "RubricJudge — AI-Powered Assignment Evaluation",
+  description:
+    "Submit your assignment draft and evaluation rubric to receive instant multi-agent AI diagnostic feedback with actionable revision advice.",
+  keywords: ["assignment evaluation", "AI grading", "rubric feedback", "academic writing"],
+  openGraph: {
+    title: "RubricJudge — AI-Powered Assignment Evaluation",
+    description: "Multi-agent AI evaluation committee for academic assignments.",
+    type: "website",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" className={`${outfit.variable} ${inter.variable} dark`}>
+      <body className="font-inter antialiased bg-slate-950 text-slate-50 min-h-screen">
+        {children}
+      </body>
+    </html>
+  );
+}

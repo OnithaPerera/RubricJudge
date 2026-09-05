@@ -1,0 +1,33 @@
+# RubricJudge Backend — Python Dependencies
+
+# Web Framework
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9      # Required for Form/File upload parsing
+
+# ── LLM Providers ────────────────────────────────────────────────────────────
+# Google Gemini (FREE tier — default provider)
+google-genai>=1.0.0
+
+# OpenAI (optional alternative)
+openai>=1.30.0
+
+# Anthropic Claude (optional alternative)
+anthropic>=0.28.0
+
+# Document parsing
+pypdf>=4.2.0
+pdfplumber>=0.11.0
+python-docx>=1.1.2
+
+# Data validation
+pydantic>=2.7.0
+
+# Utilities
+python-dotenv>=1.0.0         # Load .env files
+
+# Optional: Local model fallback (no install needed — Ollama exposes OpenAI API)
+# ollama                     # Only if you want the native Ollama Python SDK
+
+# Optional: deepeval for offline evaluation harness
+# deepeval>=0.21.0

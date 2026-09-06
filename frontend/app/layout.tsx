@@ -14,6 +14,9 @@ const inter = Inter({
   display: "swap",
 });
 
+import { ThemeProvider } from "@/components/theme-provider";
+import SiteHeader from "@/components/SiteHeader";
+
 export const metadata: Metadata = {
   title: "RubricJudge — AI-Powered Assignment Evaluation",
   description:
@@ -32,9 +35,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.variable} ${inter.variable} dark`}>
-      <body className="font-inter antialiased bg-slate-950 text-slate-50 min-h-screen">
-        {children}
+    <html lang="en" suppressHydrationWarning className={`${outfit.variable} ${inter.variable}`}>
+      <body className="font-inter antialiased bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 min-h-screen">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <SiteHeader />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

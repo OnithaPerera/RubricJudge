@@ -7,46 +7,30 @@ import { CriterionEvaluation, EvidenceQuote } from "@/lib/types";
 interface CriterionCardProps {
   criterion: CriterionEvaluation;
   index: number;
-  draftText?: string;
+  onQuoteClick: (quote: EvidenceQuote) => void;
+  isQuoteActive: (quote: EvidenceQuote) => boolean;
 }
 
 function getScoreColor(pct: number): string {
   if (pct >= 85) return "var(--color-success)";
-  if (pct >= 70) return "var(--accent-b)";
+  if (pct >= 70) return "var(--color-warning)";
   if (pct >= 55) return "hsl(28, 90%, 60%)";
   return "var(--color-error)";
 }
 
 function getBarColor(pct: number): string {
-  if (pct >= 85) return "linear-gradient(90deg, hsl(142,70%,35%), hsl(142,70%,55%))";
-  if (pct >= 70) return "linear-gradient(90deg, hsl(38,92%,40%), hsl(38,92%,60%))";
-  if (pct >= 55) return "linear-gradient(90deg, hsl(28,90%,40%), hsl(28,90%,60%))";
-  return "linear-gradient(90deg, hsl(0,75%,38%), hsl(0,75%,58%))";
+  if (pct >= 85) return "var(--color-success)";
+  if (pct >= 70) return "var(--color-warning)";
+  if (pct >= 55) return "hsl(28, 90%, 60%)";
+  return "var(--color-error)";
 }
 
-export default function CriterionCard({ criterion, index, draftText }: CriterionCardProps) {
+export default function CriterionCard({ criterion, index, onQuoteClick, isQuoteActive }: CriterionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [highlightedQuote, setHighlightedQuote] = useState<string | null>(null);
 
   const pct = criterion.percentage;
   const scoreColor = getScoreColor(pct);
   const barColor = getBarColor(pct);
-
-  const highlightDraftText = (quote: string) => {
-    setHighlightedQuote(highlightedQuote === quote ? null : quote);
-  };
-
-  // Highlight the selected quote in the draft excerpt
-  const getDraftPreview = () => {
-    if (!draftText || !highlightedQuote) return null;
-    const idx = draftText.indexOf(highlightedQuote.slice(0, 40));
-    if (idx === -1) return null;
-    const start = Math.max(0, idx - 80);
-    const end = Math.min(draftText.length, idx + highlightedQuote.length + 80);
-    return draftText.slice(start, end);
-  };
-
-  const draftPreview = getDraftPreview();
 
   return (
     <div
@@ -57,13 +41,12 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 text-left flex items-center gap-4"
-        style={{ background: "transparent", border: "none", cursor: "pointer" }}
+        className="w-full p-4 text-left flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
       >
         {/* Index bubble */}
         <div
-          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-          style={{ background: `${scoreColor}22`, color: scoreColor }}
+          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold bg-zinc-100 dark:bg-zinc-800"
+          style={{ color: scoreColor }}
         >
           {index + 1}
         </div>
@@ -71,15 +54,12 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
         {/* Title + bar */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1.5">
-            <h3 className="text-sm font-bold truncate pr-3" style={{ fontFamily: "var(--font-display)" }}>
+            <h3 className="text-sm font-bold truncate pr-3 font-display">
               {criterion.criterion_title}
             </h3>
             <div className="flex items-center gap-2 flex-shrink-0">
               {criterion.was_arbitrated && (
-                <span
-                  className="px-1.5 py-0.5 rounded text-xs font-bold"
-                  style={{ background: "hsla(38,92%,60%,0.2)", color: "var(--accent-b)", fontSize: 10 }}
-                >
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
                   RECONCILED
                 </span>
               )}
@@ -87,8 +67,8 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
                 {criterion.assigned_score.toFixed(1)}/{criterion.max_score}
               </span>
               <span
-                className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                style={{ background: `${scoreColor}22`, color: scoreColor }}
+                className="text-xs font-semibold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800"
+                style={{ color: scoreColor }}
               >
                 {pct.toFixed(0)}%
               </span>
@@ -105,10 +85,10 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
 
         {/* Agent scores mini-row */}
         <div className="hidden md:flex gap-2 flex-shrink-0">
-          {Object.entries(criterion.jury_scores).map(([agent, score]) => (
+          {criterion.jury_scores && Object.entries(criterion.jury_scores).map(([agent, score]) => (
             <div key={agent} className="text-center">
-              <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{agent.replace("Agent ", "")}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>
+              <div className="text-[10px] text-zinc-500">{agent.replace("Agent ", "")}</div>
+              <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
                 {score.toFixed(1)}
               </div>
             </div>
@@ -116,22 +96,22 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
         </div>
 
         {/* Expand toggle */}
-        <div style={{ color: "var(--text-muted)", flexShrink: 0 }}>
+        <div className="text-zinc-400 flex-shrink-0">
           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
       </button>
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="border-t px-4 pb-4 pt-3" style={{ borderColor: "var(--glass-border)" }}>
+        <div className="border-t border-zinc-200 dark:border-zinc-800 px-4 pb-4 pt-3 bg-zinc-50/50 dark:bg-zinc-900/20">
           {/* Confidence badge */}
           <div className="flex items-center gap-2 mb-4">
-            <CheckCircle2 size={13} style={{ color: "var(--text-muted)" }} />
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            <CheckCircle2 size={13} className="text-zinc-400" />
+            <span className="text-xs text-zinc-500">
               Confidence: {(criterion.confidence * 100).toFixed(0)}%
             </span>
             {criterion.arbitration_notes && (
-              <span style={{ fontSize: 12, color: "var(--accent-b)", marginLeft: 8 }}>
+              <span className="text-xs text-amber-600 dark:text-amber-400 ml-2">
                 <AlertTriangle size={12} className="inline mr-1" />
                 {criterion.arbitration_notes}
               </span>
@@ -141,74 +121,55 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
           {/* Critique */}
           {criterion.critique && (
             <div className="mb-4">
-              <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+              <p className="text-xs font-semibold mb-2 uppercase tracking-wider text-zinc-500">
                 Critique
               </p>
-              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.7 }}>
+              <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
                 {criterion.critique}
               </p>
             </div>
           )}
 
           {/* Evidence quotes */}
-          {criterion.evidence.length > 0 && (
+          {criterion.evidence?.length > 0 && (
             <div className="mb-4">
-              <p className="text-xs font-semibold mb-2 uppercase tracking-wider flex items-center gap-1"
-                style={{ color: "var(--text-muted)" }}>
+              <p className="text-xs font-semibold mb-2 uppercase tracking-wider flex items-center gap-1 text-zinc-500">
                 <Quote size={11} />
                 Evidence Quotes
-                <span style={{ fontSize: 10, fontWeight: 400, textTransform: "none" }}>
+                <span className="text-[10px] font-normal normal-case opacity-80">
                   (click to locate in draft)
                 </span>
               </p>
               <div className="space-y-2">
-                {criterion.evidence.map((quoteObj: EvidenceQuote, qi: number) => (
-                  <button
-                    key={qi}
-                    type="button"
-                    onClick={() => highlightDraftText(quoteObj.quote_text)}
-                    className="w-full text-left p-3 rounded-lg transition-all"
-                    style={{
-                      background: highlightedQuote === quoteObj.quote_text
-                        ? "hsla(248,87%,61%,0.15)"
-                        : "var(--surface-2)",
-                      border: `1px solid ${highlightedQuote === quoteObj.quote_text ? "var(--color-brand-500)" : "transparent"}`,
-                      fontSize: 13,
-                      color: "var(--text-secondary)",
-                      fontStyle: "italic",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    "{quoteObj.quote_text}"
-                    {quoteObj.confidence_score < 1.0 && quoteObj.confidence_score > 0 && (
-                       <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 8 }}>(fuzzy match)</span>
-                    )}
-                  </button>
-                ))}
+                {criterion.evidence.map((quoteObj: EvidenceQuote, qi: number) => {
+                  const isActive = isQuoteActive(quoteObj);
+                  return (
+                    <button
+                      key={qi}
+                      type="button"
+                      onClick={() => onQuoteClick(quoteObj)}
+                      className={`w-full text-left p-3 rounded-lg transition-all border text-sm leading-relaxed italic
+                        ${isActive 
+                          ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50 text-amber-900 dark:text-amber-100" 
+                          : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
+                        }
+                      `}
+                    >
+                      "{quoteObj.quote_text}"
+                      {quoteObj.confidence_score < 1.0 && quoteObj.confidence_score > 0 && (
+                         <span className="text-[10px] text-zinc-400 ml-2">(fuzzy match)</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-
-              {/* Draft context highlight */}
-              {draftPreview && (
-                <div className="mt-3 p-3 rounded-lg" style={{ background: "var(--surface-2)" }}>
-                  <p className="text-xs font-semibold mb-1" style={{ color: "var(--text-muted)" }}>
-                    Draft Context:
-                  </p>
-                  <p style={{ fontSize: 12, color: "var(--text-secondary)", fontFamily: "monospace", lineHeight: 1.7 }}>
-                    …{draftPreview.replace(
-                      highlightedQuote!.slice(0, 40),
-                      `【${highlightedQuote!.slice(0, 40)}】`
-                    )}…
-                  </p>
-                </div>
-              )}
             </div>
           )}
 
           {/* Revision prompts */}
-          {criterion.actionable_questions.length > 0 && (
+          {criterion.actionable_questions?.length > 0 && (
             <div>
-              <p className="text-xs font-semibold mb-2 uppercase tracking-wider flex items-center gap-1"
-                style={{ color: "var(--text-muted)" }}>
+              <p className="text-xs font-semibold mb-2 uppercase tracking-wider flex items-center gap-1 text-zinc-500">
                 <Lightbulb size={11} />
                 Guiding Questions for Revision
               </p>
@@ -216,10 +177,9 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
                 {criterion.actionable_questions.map((prompt, pi) => (
                   <li
                     key={pi}
-                    className="flex gap-2 p-2.5 rounded-lg"
-                    style={{ background: "hsla(142,70%,48%,0.08)", fontSize: 13, color: "var(--text-secondary)" }}
+                    className="flex gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 text-sm text-zinc-700 dark:text-zinc-300"
                   >
-                    <span style={{ color: "var(--accent-d)", flexShrink: 0, marginTop: 2 }}>›</span>
+                    <span className="text-emerald-600 dark:text-emerald-500 flex-shrink-0 mt-0.5">›</span>
                     {prompt}
                   </li>
                 ))}

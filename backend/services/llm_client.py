@@ -150,15 +150,8 @@ def _get_next_gemini_client() -> tuple[Any, str]:
     global _gemini_key_index
     from google import genai  # type: ignore
 
-    keys_str = os.environ.get("GEMINI_API_KEY", "")
-    if not keys_str:
-        raise ValueError(
-            "GEMINI_API_KEY is not set. "
-            "Get a free key at https://aistudio.google.com/apikey"
-        )
-    
-    # Split by comma and strip whitespace
-    keys: List[str] = [k.strip() for k in keys_str.split(",") if k.strip()]
+    raw_keys = os.getenv("GEMINI_API_KEY", "")
+    keys: List[str] = [k.strip() for k in raw_keys.split(",") if k.strip()]
     if not keys:
         raise ValueError("GEMINI_API_KEY contains no valid keys.")
 

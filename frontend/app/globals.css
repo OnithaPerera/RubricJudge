@@ -4,39 +4,34 @@
    Design Tokens
 ─────────────────────────────────────────────── */
 :root {
-  /* Brand Palette — deep indigo / electric violet */
-  --color-brand-50:  hsl(240, 100%, 97%);
-  --color-brand-100: hsl(240, 96%, 93%);
-  --color-brand-400: hsl(245, 91%, 72%);
-  --color-brand-500: hsl(248, 87%, 61%);
-  --color-brand-600: hsl(252, 82%, 52%);   /* primary */
-  --color-brand-700: hsl(255, 78%, 44%);
-
-  /* Surface palette */
-  --surface-0: hsl(222, 47%, 5%);    /* deepest bg */
-  --surface-1: hsl(222, 40%, 8%);    /* card bg */
-  --surface-2: hsl(222, 35%, 12%);   /* elevated card */
-  --surface-3: hsl(222, 30%, 17%);   /* input bg */
+  /* Brand Palette — Zinc/Slate */
+  --surface-0: #ffffff;    /* deepest bg */
+  --surface-1: #f4f4f5;    /* card bg */
+  --surface-2: #e4e4e7;    /* elevated card */
+  --surface-3: #d4d4d8;    /* input bg */
 
   /* Text */
-  --text-primary:   hsl(210, 40%, 96%);
-  --text-secondary: hsl(215, 20%, 65%);
-  --text-muted:     hsl(215, 15%, 45%);
+  --text-primary:   #09090b;
+  --text-secondary: #3f3f46;
+  --text-muted:     #71717a;
 
   /* Accent colours for agent badges */
-  --accent-a: hsl(186, 85%, 56%);   /* cyan — Agent A */
-  --accent-b: hsl(38,  92%, 60%);   /* amber — Agent B */
-  --accent-c: hsl(280, 80%, 68%);   /* purple — Agent C */
-  --accent-d: hsl(142, 70%, 55%);   /* green — Agent D */
+  --accent-a: #0ea5e9;   /* sky */
+  --accent-b: #eab308;   /* amber */
+  --accent-c: #a855f7;   /* purple */
+  --accent-d: #10b981;   /* emerald */
 
   /* Semantic */
-  --color-success: hsl(142, 70%, 48%);
-  --color-warning: hsl(38, 92%, 54%);
-  --color-error:   hsl(0, 75%, 58%);
+  --color-success: #10b981; /* emerald */
+  --color-warning: #f59e0b; /* amber */
+  --color-error:   #ef4444; /* rose */
+  --color-brand-400: #71717a;
+  --color-brand-500: #3f3f46;
+  --color-brand-600: #18181b;
 
   /* Glass */
-  --glass-bg: hsla(222, 40%, 12%, 0.72);
-  --glass-border: hsla(240, 50%, 70%, 0.12);
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: #e4e4e7;
 
   /* Radius */
   --radius-sm:  6px;
@@ -47,6 +42,23 @@
   /* Fonts */
   --font-display: var(--font-outfit), system-ui, sans-serif;
   --font-body:    var(--font-inter),  system-ui, sans-serif;
+}
+
+.dark {
+  /* Brand Palette — Zinc/Slate */
+  --surface-0: #09090b;    /* deepest bg */
+  --surface-1: #18181b;    /* card bg */
+  --surface-2: #27272a;    /* elevated card */
+  --surface-3: #3f3f46;    /* input bg */
+
+  /* Text */
+  --text-primary:   #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted:     #71717a;
+
+  /* Glass */
+  --glass-bg: rgba(24, 24, 27, 0.72);
+  --glass-border: #27272a;
 }
 
 /* ───────────────────────────────────────────────
@@ -95,62 +107,29 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ───────────────────────────────────────────────
-   Gradient Text
+   Print Styles
 ─────────────────────────────────────────────── */
-.gradient-text {
-  background: linear-gradient(135deg, #a78bfa 0%, #818cf8 50%, #38bdf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  .glass-card {
+    border: 1px solid #e4e4e7;
+    background: white;
+    box-shadow: none;
+    page-break-inside: avoid;
+  }
+  * {
+    color: black !important;
+    text-shadow: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
 }
-
-/* ───────────────────────────────────────────────
-   Animated background mesh
-─────────────────────────────────────────────── */
-.bg-mesh {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-
-.bg-mesh::before {
-  content: "";
-  position: absolute;
-  width: 800px; height: 800px;
-  background: radial-gradient(ellipse at center, hsla(252, 82%, 52%, 0.15) 0%, transparent 70%);
-  top: -200px; left: -200px;
-  animation: mesh-drift-a 18s ease-in-out infinite alternate;
-}
-
-.bg-mesh::after {
-  content: "";
-  position: absolute;
-  width: 600px; height: 600px;
-  background: radial-gradient(ellipse at center, hsla(186, 85%, 56%, 0.10) 0%, transparent 70%);
-  bottom: -100px; right: -100px;
-  animation: mesh-drift-b 22s ease-in-out infinite alternate;
-}
-
-@keyframes mesh-drift-a {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(120px, 80px) scale(1.15); }
-}
-@keyframes mesh-drift-b {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(-80px, -60px) scale(1.2); }
-}
-
-/* ───────────────────────────────────────────────
-   Pulse animation for active agents
-─────────────────────────────────────────────── */
-@keyframes pulse-ring {
-  0%   { transform: scale(0.95); box-shadow: 0 0 0 0 hsla(252, 82%, 62%, 0.5); }
-  70%  { transform: scale(1);    box-shadow: 0 0 0 10px hsla(252, 82%, 62%, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 hsla(252, 82%, 62%, 0); }
-}
-.pulse-ring { animation: pulse-ring 1.8s ease-out infinite; }
 
 /* ───────────────────────────────────────────────
    Progress bar fill animation

@@ -262,3 +262,73 @@ Nordhaus, W. (2017). Revisiting the social cost of carbon. Proceedings of the Na
 
 Pigou, A. C. (1920). The Economics of Welfare. Macmillan.
 `.trim();
+
+export const SAMPLE_REPORT: FinalConsensusReport = {
+  raw_points: 82.5,
+  max_possible_points: 100,
+  overall_percentage: 82.5,
+  letter_grade: "B+",
+  deterministic_stats: {
+    word_count: 520,
+    paragraph_count: 6,
+    sentence_count: 24,
+    has_section_headers: true,
+    citation_count: 5,
+    citation_density: 0.96,
+    avg_words_per_sentence: 21.6,
+    sections_detected: ["Introduction", "The Economic Case for Carbon Pricing", "Distributional Consequences and Political Economy", "Conclusion", "References"],
+  },
+  criteria_breakdown: [
+    {
+      criterion_id: "c1",
+      criterion_title: "Thesis & Argument",
+      assigned_score: 21.0,
+      max_score: 25,
+      percentage: 84.0,
+      jury_scores: { "Agent A": 22.0, "Agent B": 20.0, "Agent C": 21.0 },
+      was_arbitrated: false,
+      arbitration_notes: null,
+      evidence: [
+        {
+          quote_text: "This essay argues that while carbon pricing schemes offer theoretical economic efficiency, their practical implementation is fraught with political, distributional, and efficacy challenges that significantly undermine their effectiveness as standalone policy tools.",
+          char_start: 350,
+          char_end: 611,
+          confidence_score: 1.0,
+          context_note: "Clear thesis statement",
+        }
+      ],
+      critique: "The thesis is clear and arguable, but the argument occasionally drifts from the main focus.",
+      actionable_questions: ["How might you better connect the distributional impacts directly back to the thesis in your body paragraphs?"],
+      confidence: 0.9,
+    },
+    {
+      criterion_id: "c2",
+      criterion_title: "Evidence & Research Integration",
+      assigned_score: 18.0,
+      max_score: 25,
+      percentage: 72.0,
+      jury_scores: { "Agent A": 17.0, "Agent B": 19.0, "Agent C": 18.0 },
+      was_arbitrated: true,
+      arbitration_notes: "Agents disagreed on the adequacy of 5 sources when 6 were required.",
+      evidence: [
+        {
+          quote_text: "A meta-analysis by Lilliestam et al. (2021) found that the EU ETS reduced emissions by approximately 3-4% relative to counterfactual scenarios during its first three phases",
+          char_start: -1,
+          char_end: -1,
+          confidence_score: 0.9,
+          context_note: "Good use of empirical evidence",
+        }
+      ],
+      critique: "Evidence is relevant but you fall short of the minimum 6 peer-reviewed sources requirement.",
+      actionable_questions: ["Which additional peer-reviewed source could you incorporate to strengthen the discussion of the Yellow Vest movement?"],
+      confidence: 0.85,
+    }
+  ],
+  consensus_discrepancies: ["Agent A penalised heavily for missing one source, while Agent B focused on the quality of existing sources."],
+  top_strengths: ["Strong, nuanced thesis statement.", "Excellent real-world case study application (France)."],
+  priority_revisions: ["Add at least one more peer-reviewed source to meet the minimum requirement.", "Strengthen the transitions between the economic theory and empirical evidence sections."],
+  guiding_questions_for_revision: ["How does the Yellow Vest movement specifically challenge Pigouvian tax theory?", "Could you provide a counterargument to your conclusion that pricing alone is insufficient?"],
+  agents_used: ["Agent A", "Agent B", "Agent C", "Consensus Engine"],
+  disclaimer: "This is an AI-generated diagnostic estimate. Final grades are determined by human instructors."
+};
+

@@ -82,7 +82,7 @@ export default function AgentStatusTracker({
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="text-center mb-8 slide-up">
-        <h2 className="text-3xl font-bold mb-2 gradient-text" style={{ fontFamily: "var(--font-display)" }}>
+        <h2 className="text-3xl font-bold mb-2" style={{ fontFamily: "var(--font-display)" }}>
           Evaluation in Progress
         </h2>
         <p style={{ color: "var(--text-secondary)", fontSize: 15 }}>
@@ -135,7 +135,7 @@ export default function AgentStatusTracker({
               <div className="flex items-start gap-3">
                 {/* Status icon */}
                 <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${isActive ? "pulse-ring" : ""}`}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0`}
                   style={{
                     background: isDone
                       ? "hsla(142,70%,48%,0.2)"
@@ -198,9 +198,7 @@ export default function AgentStatusTracker({
               boxShadow: currentStage && !["completed", "failed"].includes(currentStage)
                 ? "0 0 6px var(--color-brand-400)"
                 : "none",
-              animation: currentStage && !["completed", "failed"].includes(currentStage)
-                ? "pulse-ring 1.8s infinite"
-                : "none",
+              animation: "none",
             }}
           />
           LIVE EVALUATION LOG

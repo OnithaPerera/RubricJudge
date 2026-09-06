@@ -149,9 +149,6 @@ export default function Home() {
 
   return (
     <>
-      {/* Animated mesh background */}
-      <div className="bg-mesh" aria-hidden="true" />
-
       <main className="relative z-10 min-h-screen">
         {/* Error Banner */}
         {appState === "error" && (

@@ -173,6 +173,7 @@ class CriterionEvaluation(BaseModel):
     # Guiding questions only, never replacement text.
     actionable_questions: List[str] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0, default=0.8)
+    is_advisory: bool = False
 
 
 # ---------------------------------------------------------------------------

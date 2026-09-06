@@ -93,32 +93,42 @@ export default function RevisionChecklist({ report }: RevisionChecklistProps) {
               (highest score impact first)
             </span>
           </div>
-          <div className="space-y-2">
-            {report.priority_revisions.map((improvement, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => toggle(i)}
-                className={`w-full text-left flex items-start gap-3 p-3 rounded-xl transition-all border
-                  ${checked.has(i) 
-                    ? "bg-zinc-100 dark:bg-zinc-900/50 border-transparent opacity-60" 
-                    : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
-                  }`}
-              >
-                {checked.has(i) ? (
-                  <CheckSquare size={16} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                ) : (
-                  <Square size={16} className="text-zinc-400 mt-0.5 flex-shrink-0" />
-                )}
-                <span
-                  className={`text-sm leading-relaxed ${
-                    checked.has(i) ? "text-zinc-500 line-through" : "text-zinc-700 dark:text-zinc-300"
-                  }`}
+          <div className="space-y-1">
+            {report.priority_revisions.map((improvement, i) => {
+              const isHighImpact = i < 2;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => toggle(i)}
+                  className={`w-full text-left flex items-center gap-2 p-2 rounded-md transition-all border
+                    ${checked.has(i) 
+                      ? "bg-zinc-100 dark:bg-zinc-900/50 border-transparent opacity-60" 
+                      : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    }`}
                 >
-                  {improvement}
-                </span>
-              </button>
-            ))}
+                  {checked.has(i) ? (
+                    <CheckSquare size={14} className="text-emerald-500 flex-shrink-0" />
+                  ) : (
+                    <Square size={14} className="text-zinc-400 flex-shrink-0" />
+                  )}
+                  <span
+                    className={`text-[13px] leading-snug flex-1 ${
+                      checked.has(i) ? "text-zinc-500 line-through" : "text-zinc-700 dark:text-zinc-300"
+                    }`}
+                  >
+                    {improvement}
+                  </span>
+                  <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    isHighImpact 
+                      ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" 
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
+                  }`}>
+                    {isHighImpact ? "HIGH IMPACT" : "MEDIUM IMPACT"}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

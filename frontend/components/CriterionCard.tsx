@@ -41,64 +41,79 @@ export default function CriterionCard({ criterion, index, onQuoteClick, isQuoteA
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 text-left flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+        className="w-full p-4 text-left flex flex-col gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
       >
-        {/* Index bubble */}
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold bg-zinc-100 dark:bg-zinc-800"
-          style={{ color: scoreColor }}
-        >
-          {index + 1}
-        </div>
-
-        {/* Title + bar */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1.5">
-            <h3 className="text-sm font-bold truncate pr-3 font-display">
+        {/* Top row: Title + Actions */}
+        <div className="flex items-start justify-between w-full gap-4">
+          {/* Left side: Index + Title */}
+          <div className="flex items-start gap-3">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold bg-zinc-100 dark:bg-zinc-800 mt-0.5"
+              style={{ color: criterion.is_advisory ? "var(--text-muted)" : scoreColor }}
+            >
+              {index + 1}
+            </div>
+            <h3 className="text-sm font-bold font-display leading-snug">
               {criterion.criterion_title}
             </h3>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {criterion.was_arbitrated && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
-                  RECONCILED
+          </div>
+
+          {/* Right side: Badges + Score + Chevron */}
+          <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0 mt-1">
+            {criterion.is_advisory && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                ADVISORY (UNGRADED)
+              </span>
+            )}
+            {criterion.was_arbitrated && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                RECONCILED
+              </span>
+            )}
+            {!criterion.is_advisory && (
+              <>
+                <span className="font-bold text-sm" style={{ color: scoreColor }}>
+                  {criterion.assigned_score.toFixed(1)}/{criterion.max_score}
                 </span>
-              )}
-              <span className="font-bold text-sm" style={{ color: scoreColor }}>
-                {criterion.assigned_score.toFixed(1)}/{criterion.max_score}
-              </span>
-              <span
-                className="text-xs font-semibold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800"
-                style={{ color: scoreColor }}
-              >
-                {pct.toFixed(0)}%
-              </span>
+                <span
+                  className="text-xs font-semibold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800"
+                  style={{ color: scoreColor }}
+                >
+                  {pct.toFixed(0)}%
+                </span>
+              </>
+            )}
+            <div className="text-zinc-400 ml-1">
+              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </div>
-          </div>
-          {/* Score bar */}
-          <div className="score-bar-track">
-            <div
-              className="score-bar-fill"
-              style={{ width: `${pct}%`, background: barColor }}
-            />
           </div>
         </div>
 
-        {/* Agent scores mini-row */}
-        <div className="hidden md:flex gap-2 flex-shrink-0">
-          {criterion.jury_scores && Object.entries(criterion.jury_scores).map(([agent, score]) => (
-            <div key={agent} className="text-center">
-              <div className="text-[10px] text-zinc-500">{agent.replace("Agent ", "")}</div>
-              <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                {score.toFixed(1)}
+        {/* Score bar */}
+        {!criterion.is_advisory && (
+          <div className="w-full pl-11 pr-2">
+            <div className="score-bar-track">
+              <div
+                className="score-bar-fill"
+                style={{ width: `${pct}%`, background: barColor }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Jury scores mini-row */}
+        {criterion.jury_scores && Object.keys(criterion.jury_scores).length > 0 && (
+          <div className="w-full pl-11 flex flex-wrap gap-2">
+            {Object.entries(criterion.jury_scores).map(([agent, score]) => (
+              <div key={agent} className="flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-100/50 dark:bg-zinc-800/30 border border-zinc-200/50 dark:border-zinc-700/50">
+                <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">{agent.replace("Agent ", "")}</span>
+                <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                  {score.toFixed(1)}
+                </span>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Expand toggle */}
-        <div className="text-zinc-400 flex-shrink-0">
-          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </div>
+            ))}
+          </div>
+        )}
       </button>
 
       {/* Expanded content */}

@@ -98,6 +98,7 @@ export interface CriterionEvaluation {
   /** Guiding questions only, never replacement text. */
   actionable_questions: string[];
   confidence: number;
+  is_advisory?: boolean;
 }
 
 /**

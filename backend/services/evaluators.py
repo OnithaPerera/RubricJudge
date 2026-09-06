@@ -545,16 +545,10 @@ Synthesise the top strengths, improvements, and guiding questions.
 # ---------------------------------------------------------------------------
 
 def _letter_grade(percentage: float) -> str:
-    if percentage >= 93: return "A"
-    if percentage >= 90: return "A-"
-    if percentage >= 87: return "B+"
-    if percentage >= 83: return "B"
-    if percentage >= 80: return "B-"
-    if percentage >= 77: return "C+"
-    if percentage >= 73: return "C"
-    if percentage >= 70: return "C-"
-    if percentage >= 67: return "D+"
-    if percentage >= 60: return "D"
+    if percentage >= 85: return "HD"
+    if percentage >= 75: return "D"
+    if percentage >= 65: return "C"
+    if percentage >= 50: return "P"
     return "F"
 
 
@@ -696,6 +690,8 @@ async def run_evaluation_pipeline(
 
         percentage = round(assigned_score / criterion.max_score * 100, 1) if criterion.max_score > 0 else 0.0
 
+        is_advisory = (criterion.max_score == 0 or criterion.weight_percentage == 0)
+
         criteria_breakdown.append(
             CriterionEvaluation(
                 criterion_id=criterion.id,
@@ -710,6 +706,7 @@ async def run_evaluation_pipeline(
                 critique=best_agent_result.critique if best_agent_result else "",
                 actionable_questions=unique_suggestions[:5],
                 confidence=round(best_confidence, 2) if best_confidence >= 0 else 0.7,
+                is_advisory=is_advisory,
             )
         )
 
@@ -729,9 +726,19 @@ async def run_evaluation_pipeline(
         )
     )
 
-    total_score = sum(rc.assigned_score for rc in criteria_breakdown)
-    max_possible = rubric.total_points
-    percentage = round(total_score / max_possible * 100, 1) if max_possible > 0 else 0.0
+    graded = [c for c in rubric.criteria if c.max_score > 0 and c.weight_percentage > 0]
+    total_weight = sum(c.weight_percentage for c in graded)
+    if total_weight > 0:
+        overall_percentage = sum(
+            (next((rc.assigned_score for rc in criteria_breakdown if rc.criterion_id == c.id), 0.0) / c.max_score) * c.weight_percentage
+            for c in graded
+        ) / total_weight * 100.0
+    else:
+        overall_percentage = 0.0
+    percentage = round(overall_percentage, 1)
+
+    total_score = sum(rc.assigned_score for rc in criteria_breakdown if not rc.is_advisory)
+    max_possible = sum(rc.max_score for rc in criteria_breakdown if not rc.is_advisory)
 
     return FinalConsensusReport(
         raw_points=round(total_score, 2),

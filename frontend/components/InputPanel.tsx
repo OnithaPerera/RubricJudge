@@ -17,27 +17,24 @@ interface FileState {
 }
 
 export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
-  const [rubricText, setRubricText] = useState("");
-  const [draftText, setDraftText] = useState("");
   const [assignmentTitle, setAssignmentTitle] = useState("");
   const [rubricFile, setRubricFile] = useState<FileState | null>(null);
   const [draftFile, setDraftFile] = useState<FileState | null>(null);
   const [rubricDragging, setRubricDragging] = useState(false);
   const [draftDragging, setDraftDragging] = useState(false);
-  const [activeTab, setActiveTab] = useState<"paste" | "upload">("paste");
   const rubricInputRef = useRef<HTMLInputElement>(null);
   const draftInputRef = useRef<HTMLInputElement>(null);
 
   const loadSample = () => {
-    setRubricText(SAMPLE_RUBRIC);
-    setDraftText(SAMPLE_DRAFT);
+    const rFile = new File([SAMPLE_RUBRIC], "sample_rubric.txt", { type: "text/plain" });
+    const dFile = new File([SAMPLE_DRAFT], "sample_draft.txt", { type: "text/plain" });
+    setRubricFile({ name: rFile.name, size: rFile.size, rawFile: rFile, text: SAMPLE_RUBRIC });
+    setDraftFile({ name: dFile.name, size: dFile.size, rawFile: dFile, text: SAMPLE_DRAFT });
     setAssignmentTitle("Critical Analysis Essay – Climate Change Policy");
-    setRubricFile(null);
-    setDraftFile(null);
   };
 
-  const hasRubric = Boolean(rubricFile || rubricText.trim().length > 20);
-  const hasDraft = Boolean(draftFile || draftText.trim().split(/\s+/).length >= 30);
+  const hasRubric = Boolean(rubricFile);
+  const hasDraft = Boolean(draftFile);
   const canSubmit = hasRubric && hasDraft;
 
   const handleFileSelect = (
@@ -78,8 +75,8 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
     e.preventDefault();
     if (!canSubmit) return;
     onSubmit(
-      draftFile?.text || draftText,
-      rubricFile?.text || rubricText,
+      draftFile?.text || "",
+      rubricFile?.text || "",
       assignmentTitle,
       draftFile?.rawFile,
       rubricFile?.rawFile
@@ -124,13 +121,7 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
         </button>
       </div>
 
-      {/* Tab bar */}
-      <div className="tab-bar mb-6 slide-up slide-up-delay-1" style={{ maxWidth: 280 }}>
-        <button type="button" className={`tab-item ${activeTab === "paste" ? "active" : ""}`}
-          onClick={() => setActiveTab("paste")}>Paste Text</button>
-        <button type="button" className={`tab-item ${activeTab === "upload" ? "active" : ""}`}
-          onClick={() => setActiveTab("upload")}>Upload File</button>
-      </div>
+
 
       {/* Two-column input */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8 slide-up slide-up-delay-2">
@@ -152,15 +143,6 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
             </div>
           </div>
 
-          {activeTab === "paste" ? (
-            <textarea
-              value={rubricText}
-              onChange={(e) => setRubricText(e.target.value)}
-              className="rj-textarea"
-              rows={14}
-              placeholder="Paste your rubric here…&#10;&#10;Example:&#10;1. Thesis Statement (25 pts): Clear, arguable thesis…&#10;2. Evidence (25 pts): Minimum 6 peer-reviewed sources…"
-            />
-          ) : (
             <div
               className={`drop-zone flex flex-col items-center justify-center gap-3 ${rubricDragging ? "dragging" : ""}`}
               style={{ minHeight: 200 }}
@@ -190,12 +172,11 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
                 </>
               )}
             </div>
-          )}
 
           {/* Word count indicator */}
           <div className="flex justify-end" style={{ marginTop: -4 }}>
             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-              {(rubricFile?.text || rubricText).split(/\s+/).filter(Boolean).length} words
+              {rubricFile ? `${(rubricFile.size / 1024).toFixed(1)} KB` : ""}
             </span>
           </div>
         </div>
@@ -217,15 +198,6 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
             </div>
           </div>
 
-          {activeTab === "paste" ? (
-            <textarea
-              value={draftText}
-              onChange={(e) => setDraftText(e.target.value)}
-              className="rj-textarea"
-              rows={14}
-              placeholder="Paste your assignment draft here…&#10;&#10;Minimum 30 words required for evaluation."
-            />
-          ) : (
             <div
               className={`drop-zone flex flex-col items-center justify-center gap-3 ${draftDragging ? "dragging" : ""}`}
               style={{ minHeight: 200 }}
@@ -255,12 +227,10 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
                 </>
               )}
             </div>
-          )}
 
           <div className="flex justify-between" style={{ marginTop: -4 }}>
-            <span style={{ fontSize: 11, color: (draftFile?.text || draftText).split(/\s+/).filter(Boolean).length < 30 ? "var(--color-warning)" : "var(--text-muted)" }}>
-              {(draftFile?.text || draftText).split(/\s+/).filter(Boolean).length} words
-              {(draftFile?.text || draftText).split(/\s+/).filter(Boolean).length < 30 && " (min 30)"}
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              {draftFile ? `${(draftFile.size / 1024).toFixed(1)} KB` : ""}
             </span>
           </div>
         </div>

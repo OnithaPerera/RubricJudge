@@ -60,14 +60,20 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
         doc = Document(io.BytesIO(file_bytes))
         paragraphs: list[str] = []
         for para in doc.paragraphs:
+            xml_str = getattr(para._element, "xml", "")
+            if "<w:drawing" in xml_str or "<a:graphic" in xml_str:
+                paragraphs.append("[Visual Screenshot / Figure Attached]")
             if para.text.strip():
                 paragraphs.append(para.text.strip())
-        # Also pull text from tables
+        # Also pull text from tables, formatting them as Markdown
         for table in doc.tables:
-            for row in table.rows:
-                row_text = " | ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
-                if row_text:
-                    paragraphs.append(row_text)
+            for i, row in enumerate(table.rows):
+                cleaned_cells = [cell.text.replace('\n', ' ').replace('\r', '').strip() for cell in row.cells]
+                row_text = "| " + " | ".join(cleaned_cells) + " |"
+                paragraphs.append(row_text)
+                if i == 0:
+                    separator = "| " + " | ".join(["---"] * len(row.cells)) + " |"
+                    paragraphs.append(separator)
         return "\n\n".join(paragraphs).strip()
     except Exception as exc:
         logger.error("python-docx extraction failed: %s", exc)

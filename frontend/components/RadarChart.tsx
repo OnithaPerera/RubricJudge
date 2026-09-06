@@ -40,16 +40,18 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 };
 
 export default function RadarChart({ criteria }: RadarChartProps) {
-  const data = criteria.map((c) => ({
-    subject:
-      c.criterion_title.length > 18
-        ? c.criterion_title.slice(0, 16) + "…"
-        : c.criterion_title,
-    fullTitle: c.criterion_title,
-    percentage: c.percentage,
-    score: c.assigned_score,
-    max: c.max_score,
-  }));
+  const data = criteria
+    .filter((c) => c.max_score > 0 && !c.is_advisory)
+    .map((c) => ({
+      subject:
+        c.criterion_title.length > 18
+          ? c.criterion_title.slice(0, 16) + "…"
+          : c.criterion_title,
+      fullTitle: c.criterion_title,
+      percentage: c.percentage,
+      score: c.assigned_score,
+      max: c.max_score,
+    }));
 
   if (data.length < 3) {
     return (

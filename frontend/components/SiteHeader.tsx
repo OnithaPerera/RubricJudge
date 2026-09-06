@@ -7,9 +7,9 @@ export default function SiteHeader() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <header className="w-full border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 py-4 flex items-center justify-between sticky top-0 z-50 print:hidden">
+    <header className="w-full border-b border-border bg-background px-6 py-4 flex items-center justify-between sticky top-0 z-50 print:hidden">
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "var(--font-display)" }}>
+        <h1 className="text-xl font-bold tracking-tight text-foreground" style={{ fontFamily: "var(--font-display)" }}>
           RubricJudge
         </h1>
       </div>

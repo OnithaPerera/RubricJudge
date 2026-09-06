@@ -26,10 +26,9 @@ interface ResultsDashboardProps {
 
 type TabId = "overview" | "criteria" | "revision";
 
-function getGradeStyle(grade: string): { bg: string; color: string } {
-  if (grade.startsWith("A")) return { bg: "hsla(142,70%,48%,0.2)", color: "var(--color-success)" };
-  if (grade.startsWith("B")) return { bg: "hsla(186,85%,56%,0.2)", color: "var(--accent-a)" };
-  if (grade.startsWith("C")) return { bg: "hsla(38,92%,60%,0.2)", color: "var(--accent-b)" };
+function getGradeStyle(grade: string, percentage: number): { bg: string; color: string } {
+  if (percentage >= 75) return { bg: "hsla(142,70%,48%,0.2)", color: "var(--color-success)" };
+  if (percentage >= 50) return { bg: "hsla(38,92%,60%,0.2)", color: "var(--color-warning)" };
   return { bg: "hsla(0,75%,58%,0.2)", color: "var(--color-error)" };
 }
 
@@ -90,120 +89,20 @@ function exportMarkdown(report: FinalConsensusReport): void {
   URL.revokeObjectURL(url);
 }
 
-export default function ResultsDashboard({ report, onReset, draftText = "" }: ResultsDashboardProps) {
+export default function ResultsDashboard({ report, onReset }: ResultsDashboardProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
-  const [highlightedQuote, setHighlightedQuote] = useState<EvidenceQuote | null>(null);
   
-  const gradeStyle = getGradeStyle(report.letter_grade);
+  const gradeStyle = getGradeStyle(report.letter_grade, report.overall_percentage);
   const stats = report.deterministic_stats;
 
   const circumference = 2 * Math.PI * 45;
   const strokeDashoffset = circumference - (report.overall_percentage / 100) * circumference;
 
-  const textRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (highlightedQuote && textRef.current) {
-      setTimeout(() => {
-        const mark = textRef.current?.querySelector("mark");
-        if (mark) {
-          mark.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 100);
-    }
-  }, [highlightedQuote]);
-
-  const renderDocument = () => {
-    if (!draftText) return <p className="text-zinc-500 italic p-4">No document text available.</p>;
-
-    let startIdx = -1;
-    let endIdx = -1;
-    
-    if (highlightedQuote) {
-      if (highlightedQuote.char_start >= 0 && highlightedQuote.char_end > highlightedQuote.char_start) {
-        startIdx = highlightedQuote.char_start;
-        endIdx = highlightedQuote.char_end;
-      } else if (highlightedQuote.quote_text) {
-        const idx = draftText.toLowerCase().indexOf(highlightedQuote.quote_text.toLowerCase());
-        if (idx >= 0) {
-          startIdx = idx;
-          endIdx = idx + highlightedQuote.quote_text.length;
-        }
-      }
-    }
-
-    const renderLine = (line: string, i: number, lineStart: number, lineEnd: number) => {
-      let content: React.ReactNode = line || " ";
-      
-      if (startIdx >= 0 && endIdx >= 0) {
-        if (startIdx < lineEnd && endIdx > lineStart) {
-          const highlightStart = Math.max(0, startIdx - lineStart);
-          const highlightEnd = Math.min(line.length, endIdx - lineStart);
-          const before = line.slice(0, highlightStart);
-          const highlighted = line.slice(highlightStart, highlightEnd);
-          const after = line.slice(highlightEnd);
-          content = (
-            <>
-              {before}
-              <mark className="bg-amber-200 dark:bg-amber-500/40 text-inherit rounded px-0.5">{highlighted}</mark>
-              {after}
-            </>
-          );
-        }
-      }
-      
-      return (
-        <div key={i} className="flex gap-4 font-mono text-xs md:text-sm mb-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded pr-2 transition-colors">
-          <span className="w-8 text-right text-zinc-400 select-none flex-shrink-0">{i + 1}</span>
-          <span className="text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap flex-1 break-words">{content}</span>
-        </div>
-      );
-    };
-
-    let currentIdx = 0;
-    return draftText.split("\n").map((line, i) => {
-      const lineStart = currentIdx;
-      const lineEnd = currentIdx + line.length;
-      currentIdx = lineEnd + 1; // +1 for newline character
-      return renderLine(line, i, lineStart, lineEnd);
-    });
-  };
-
   return (
-    <div className="w-full h-[calc(100vh-65px)] flex flex-col md:flex-row overflow-hidden bg-zinc-50 dark:bg-zinc-950">
-      {/* Left Pane: Document View */}
-      <div className="w-full md:w-5/12 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 flex flex-col bg-white dark:bg-zinc-900 print:hidden">
-        {/* Sticky Toolbar */}
-        <div className="border-b border-zinc-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900 flex items-center justify-between shadow-sm z-10 sticky top-0">
-          <div className="flex gap-3">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              <FileText size={14} />
-              <span>{stats.word_count} words</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              <QuoteIcon />
-              <span>{stats.citation_density.toFixed(1)} cit/100w</span>
-            </div>
-          </div>
-          {highlightedQuote && (
-            <button
-              onClick={() => setHighlightedQuote(null)}
-              className="text-xs bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-2 py-1 rounded flex items-center gap-1 transition-colors"
-            >
-              <X size={12} /> Clear Highlight
-            </button>
-          )}
-        </div>
-        {/* Document Body */}
-        <div className="flex-1 overflow-y-auto p-4" ref={textRef}>
-          {renderDocument()}
-        </div>
-      </div>
-
-      {/* Right Pane: Report */}
-      <div className="w-full md:w-7/12 h-1/2 md:h-full overflow-y-auto p-4 md:p-8 bg-zinc-50 dark:bg-zinc-950/50 print:w-full print:h-auto print:overflow-visible">
+    <div className="w-full min-h-[calc(100vh-65px)] bg-background">
+      <div className="max-w-5xl mx-auto w-full p-4 md:p-8">
         
-        {/* Header (hidden in print, handles by globals.css) */}
+        {/* Header (hidden in print, handled by globals.css) */}
         <div className="flex items-center justify-between mb-8 print:hidden">
           <div>
             <h2 className="text-2xl font-bold font-display text-zinc-900 dark:text-zinc-100">
@@ -212,6 +111,10 @@ export default function ResultsDashboard({ report, onReset, draftText = "" }: Re
             <p className="text-xs text-zinc-500 mt-1">{report.disclaimer}</p>
           </div>
           <div className="flex gap-2">
+            <button type="button" className="btn-ghost" onClick={() => window.print()}>
+              <FileText size={14} />
+              Export PDF
+            </button>
             <button type="button" className="btn-ghost" onClick={() => exportMarkdown(report)}>
               <Download size={14} />
               Export .md
@@ -358,10 +261,6 @@ export default function ResultsDashboard({ report, onReset, draftText = "" }: Re
                 key={c.criterion_id} 
                 criterion={c} 
                 index={i} 
-                onQuoteClick={(quote) => {
-                  setHighlightedQuote(quote === highlightedQuote ? null : quote);
-                }}
-                isQuoteActive={(quote) => quote === highlightedQuote}
               />
             ))}
           </div>

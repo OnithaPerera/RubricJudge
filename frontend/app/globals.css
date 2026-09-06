@@ -15,6 +15,13 @@
   --text-secondary: #3f3f46;
   --text-muted:     #71717a;
 
+  /* Theme System */
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --border: 240 5.9% 90%;
+
   /* Accent colours for agent badges */
   --accent-a: #0ea5e9;   /* sky */
   --accent-b: #eab308;   /* amber */
@@ -55,6 +62,13 @@
   --text-primary:   #fafafa;
   --text-secondary: #a1a1aa;
   --text-muted:     #71717a;
+
+  /* Theme System */
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 240 10% 5.9%;
+  --card-foreground: 0 0% 98%;
+  --border: 240 3.7% 15.9%;
 
   /* Glass */
   --glass-bg: rgba(24, 24, 27, 0.72);
@@ -110,24 +124,40 @@ h1, h2, h3, h4, h5, h6 {
    Print Styles
 ─────────────────────────────────────────────── */
 @media print {
+  @page {
+    margin: 1.5cm;
+  }
+  
   body {
     background: white !important;
     color: black !important;
   }
+  
   .print\:hidden {
     display: none !important;
   }
+  
   .glass-card {
     border: 1px solid #e4e4e7;
-    background: white;
-    box-shadow: none;
+    background: white !important;
+    box-shadow: none !important;
     page-break-inside: avoid;
+    break-inside: avoid;
   }
+  
   * {
     color: black !important;
     text-shadow: none !important;
-    background: transparent !important;
     box-shadow: none !important;
+  }
+  
+  /* Ensure all content in criteria cards is expanded and visible */
+  .print\:block {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    height: auto !important;
+    max-height: none !important;
   }
 }
 

@@ -7,8 +7,6 @@ import { CriterionEvaluation, EvidenceQuote } from "@/lib/types";
 interface CriterionCardProps {
   criterion: CriterionEvaluation;
   index: number;
-  onQuoteClick: (quote: EvidenceQuote) => void;
-  isQuoteActive: (quote: EvidenceQuote) => boolean;
 }
 
 function getScoreColor(pct: number): string {
@@ -25,7 +23,7 @@ function getBarColor(pct: number): string {
   return "var(--color-error)";
 }
 
-export default function CriterionCard({ criterion, index, onQuoteClick, isQuoteActive }: CriterionCardProps) {
+export default function CriterionCard({ criterion, index }: CriterionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const pct = criterion.percentage;
@@ -117,8 +115,7 @@ export default function CriterionCard({ criterion, index, onQuoteClick, isQuoteA
       </button>
 
       {/* Expanded content */}
-      {isExpanded && (
-        <div className="border-t border-zinc-200 dark:border-zinc-800 px-4 pb-4 pt-3 bg-zinc-50/50 dark:bg-zinc-900/20">
+      <div className={`border-t border-zinc-200 dark:border-zinc-800 px-4 pb-4 pt-3 bg-zinc-50/50 dark:bg-zinc-900/20 ${isExpanded ? "block" : "hidden print:block"}`}>
           {/* Confidence badge */}
           <div className="flex items-center gap-2 mb-4">
             <CheckCircle2 size={13} className="text-zinc-400" />
@@ -151,30 +148,19 @@ export default function CriterionCard({ criterion, index, onQuoteClick, isQuoteA
               <p className="text-xs font-semibold mb-2 uppercase tracking-wider flex items-center gap-1 text-zinc-500">
                 <Quote size={11} />
                 Evidence Quotes
-                <span className="text-[10px] font-normal normal-case opacity-80">
-                  (click to locate in draft)
-                </span>
               </p>
               <div className="space-y-2">
                 {criterion.evidence.map((quoteObj: EvidenceQuote, qi: number) => {
-                  const isActive = isQuoteActive(quoteObj);
                   return (
-                    <button
+                    <div
                       key={qi}
-                      type="button"
-                      onClick={() => onQuoteClick(quoteObj)}
-                      className={`w-full text-left p-3 rounded-lg transition-all border text-sm leading-relaxed italic
-                        ${isActive 
-                          ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50 text-amber-900 dark:text-amber-100" 
-                          : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
-                        }
-                      `}
+                      className="w-full text-left p-3 rounded-lg border text-sm leading-relaxed italic bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
                     >
                       "{quoteObj.quote_text}"
                       {quoteObj.confidence_score < 1.0 && quoteObj.confidence_score > 0 && (
                          <span className="text-[10px] text-zinc-400 ml-2">(fuzzy match)</span>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -202,7 +188,6 @@ export default function CriterionCard({ criterion, index, onQuoteClick, isQuoteA
             </div>
           )}
         </div>
-      )}
     </div>
   );
 }

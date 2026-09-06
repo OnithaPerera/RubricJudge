@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp, CheckCircle2, Quote, AlertTriangle, Lightbulb } from "lucide-react";
-import { ReconciledCriterionScore } from "@/lib/types";
+import { CriterionEvaluation, EvidenceQuote } from "@/lib/types";
 
 interface CriterionCardProps {
-  criterion: ReconciledCriterionScore;
+  criterion: CriterionEvaluation;
   index: number;
   draftText?: string;
 }
@@ -75,7 +75,7 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
               {criterion.criterion_title}
             </h3>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {criterion.was_reconciled && (
+              {criterion.was_arbitrated && (
                 <span
                   className="px-1.5 py-0.5 rounded text-xs font-bold"
                   style={{ background: "hsla(38,92%,60%,0.2)", color: "var(--accent-b)", fontSize: 10 }}
@@ -84,7 +84,7 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
                 </span>
               )}
               <span className="font-bold text-sm" style={{ color: scoreColor }}>
-                {criterion.final_score.toFixed(1)}/{criterion.max_score}
+                {criterion.assigned_score.toFixed(1)}/{criterion.max_score}
               </span>
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full"
@@ -105,7 +105,7 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
 
         {/* Agent scores mini-row */}
         <div className="hidden md:flex gap-2 flex-shrink-0">
-          {Object.entries(criterion.agent_scores).map(([agent, score]) => (
+          {Object.entries(criterion.jury_scores).map(([agent, score]) => (
             <div key={agent} className="text-center">
               <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{agent.replace("Agent ", "")}</div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>
@@ -130,10 +130,10 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
             <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
               Confidence: {(criterion.confidence * 100).toFixed(0)}%
             </span>
-            {criterion.arbitration_reasoning && (
+            {criterion.arbitration_notes && (
               <span style={{ fontSize: 12, color: "var(--accent-b)", marginLeft: 8 }}>
                 <AlertTriangle size={12} className="inline mr-1" />
-                {criterion.arbitration_reasoning}
+                {criterion.arbitration_notes}
               </span>
             )}
           </div>
@@ -151,7 +151,7 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
           )}
 
           {/* Evidence quotes */}
-          {criterion.evidence_quotes.length > 0 && (
+          {criterion.evidence.length > 0 && (
             <div className="mb-4">
               <p className="text-xs font-semibold mb-2 uppercase tracking-wider flex items-center gap-1"
                 style={{ color: "var(--text-muted)" }}>
@@ -162,24 +162,27 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
                 </span>
               </p>
               <div className="space-y-2">
-                {criterion.evidence_quotes.map((quote, qi) => (
+                {criterion.evidence.map((quoteObj: EvidenceQuote, qi: number) => (
                   <button
                     key={qi}
                     type="button"
-                    onClick={() => highlightDraftText(quote)}
+                    onClick={() => highlightDraftText(quoteObj.quote_text)}
                     className="w-full text-left p-3 rounded-lg transition-all"
                     style={{
-                      background: highlightedQuote === quote
+                      background: highlightedQuote === quoteObj.quote_text
                         ? "hsla(248,87%,61%,0.15)"
                         : "var(--surface-2)",
-                      border: `1px solid ${highlightedQuote === quote ? "var(--color-brand-500)" : "transparent"}`,
+                      border: `1px solid ${highlightedQuote === quoteObj.quote_text ? "var(--color-brand-500)" : "transparent"}`,
                       fontSize: 13,
                       color: "var(--text-secondary)",
                       fontStyle: "italic",
                       lineHeight: 1.6,
                     }}
                   >
-                    "{quote}"
+                    "{quoteObj.quote_text}"
+                    {quoteObj.confidence_score < 1.0 && quoteObj.confidence_score > 0 && (
+                       <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 8 }}>(fuzzy match)</span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -202,7 +205,7 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
           )}
 
           {/* Revision prompts */}
-          {criterion.actionable_revision_prompts.length > 0 && (
+          {criterion.actionable_questions.length > 0 && (
             <div>
               <p className="text-xs font-semibold mb-2 uppercase tracking-wider flex items-center gap-1"
                 style={{ color: "var(--text-muted)" }}>
@@ -210,7 +213,7 @@ export default function CriterionCard({ criterion, index, draftText }: Criterion
                 Guiding Questions for Revision
               </p>
               <ul className="space-y-2">
-                {criterion.actionable_revision_prompts.map((prompt, pi) => (
+                {criterion.actionable_questions.map((prompt, pi) => (
                   <li
                     key={pi}
                     className="flex gap-2 p-2.5 rounded-lg"

@@ -2,7 +2,7 @@
 
 > **AI-powered multi-agent assignment evaluation platform.**
 > 
-> A committee of four specialist AI judges evaluates your assignment draft against a rubric, reconciles their disagreements, and delivers a diagnostic report with scores, evidence, and guided revision questions.
+> A committee of specialist AI judges evaluates your assignment draft against a rubric, reconciles disagreements, and delivers a diagnostic report with scores, evidence, and guided revision questions.
 
 ---
 
@@ -12,24 +12,25 @@
 [Student Draft + Rubric]
         │
         ▼
-[Agent 0: Rubric Parser & Normalizer]   ← Heuristic + LLM fallback
+[Agent 0: Rubric Parser & Normalizer]   <- Heuristic + LLM fallback
         │
         ▼
-[Deterministic Pre-Processor]           ← Word count, citations, headers (no LLM)
+[Deterministic Pre-Processor]           <- Word count, citations, headers (no LLM)
         │
         ▼
-[Phase 2: Parallel Specialist Judges — asyncio.gather()]
-  ├── Agent A: Rubric Alignment Judge   ← G-Eval 5-step CoT
-  ├── Agent B: Critical Reasoning Judge ← Devil's advocate depth
-  └── Agent C: Style & Citations Auditor
+[Parallel Specialist Judges - asyncio.gather()]
+  ├── Agent A: Rubric Alignment Judge   <- G-Eval 5-step CoT
+  ├── Agent B: Critical Reasoning Judge <- Depth, logic, and assumptions
+  └── Agent C: Style & Citations Auditor<- Clarity, structure, references
         │
         ▼
 [Agent D: Consensus Engine]
   ├── Category-weighted score merge
-  └── Reconciliation pass if variance > 20% on any criterion
+  ├── Reconciliation pass if variance > 15% on any criterion
+  └── Python-deterministic quote offset verification
         │
         ▼
-[Phase 4: Final Report]                 ← Anti-ghostwriting filtered
+[Final Report Generation]               <- Anti-ghostwriting filtered
 ```
 
 ---
@@ -38,10 +39,11 @@
 
 | Layer | Technology |
 |---|---|
-| Backend | Python 3.11+, FastAPI, Pydantic v2 |
-| LLM Orchestration | OpenAI GPT-4o (primary), Anthropic Claude (optional), Ollama (local) |
+| Backend | Python 3.11+, FastAPI, Pydantic v2, `aiosqlite` |
+| LLM Orchestration | Google Gemini (default, multi-key round-robin), OpenAI GPT-4o, Anthropic Claude, Ollama (local) |
+| Job Storage | SQLite via `aiosqlite` (persistent, async TTL cleanup, in-memory SSE queue) |
 | Document Parsing | `pdfplumber`, `pypdf`, `python-docx` |
-| Streaming | SSE via FastAPI `StreamingResponse` |
+| Streaming | Server-Sent Events (SSE) via FastAPI `StreamingResponse` |
 | Frontend | Next.js 15 (App Router), TypeScript, Tailwind CSS |
 | Charts | Recharts (`RadarChart`) |
 | Icons | `lucide-react` |
@@ -53,7 +55,7 @@
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
-- An OpenAI API key (or Anthropic / local Ollama)
+- A Google Gemini API key (free at [Google AI Studio](https://aistudio.google.com/apikey)), or OpenAI / Anthropic / local Ollama
 
 ### 1. Backend Setup
 
@@ -72,7 +74,7 @@ pip install -r requirements.txt
 
 # Configure environment
 copy .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# Edit .env and add your GEMINI_API_KEY (or OpenAI/Anthropic keys)
 
 # Run the API server
 uvicorn main:app --reload --port 8000
@@ -103,13 +105,13 @@ Start an evaluation. Accepts `multipart/form-data`:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `draft_text` | string | ✓* | Raw assignment text |
-| `rubric_text` | string | ✓* | Raw rubric text |
-| `draft_file` | file | ✓* | PDF/DOCX/TXT upload |
-| `rubric_file` | file | ✓* | PDF/DOCX/TXT upload |
-| `assignment_title` | string | — | Optional title |
+| `draft_text` | string | Optional* | Raw assignment text |
+| `rubric_text` | string | Optional* | Raw rubric text |
+| `draft_file` | file | Optional* | PDF/DOCX/TXT upload |
+| `rubric_file` | file | Optional* | PDF/DOCX/TXT upload |
+| `assignment_title` | string | Optional | Optional assignment title |
 
-*One of `_text` or `_file` is required for each.
+*One of `_text` or `_file` is required for each of draft and rubric.
 
 **Response:**
 ```json
@@ -142,15 +144,17 @@ Polling fallback. Returns current job status and final result if complete.
 
 | Variable | Default | Description |
 |---|---|---|
-| `LLM_PROVIDER` | `openai` | `openai` \| `anthropic` \| `ollama` |
-| `OPENAI_API_KEY` | — | Required for OpenAI provider |
-| `OPENAI_MODEL` | `gpt-4o` | Model ID |
-| `ANTHROPIC_API_KEY` | — | Required for Anthropic provider |
-| `ANTHROPIC_MODEL` | `claude-3-5-sonnet-20241022` | Model ID |
+| `LLM_PROVIDER` | `gemini` | `gemini` \| `openai` \| `anthropic` \| `ollama` |
+| `GEMINI_API_KEY` | None | Gemini API Key(s). Supports comma-separated keys for auto round-robin rotation |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model ID (e.g. `gemini-2.0-flash`, `gemini-2.5-flash`) |
+| `OPENAI_API_KEY` | None | Required for OpenAI provider |
+| `OPENAI_MODEL` | `gpt-4o` | Model ID for OpenAI |
+| `ANTHROPIC_API_KEY` | None | Required for Anthropic provider |
+| `ANTHROPIC_MODEL` | `claude-3-5-sonnet-20241022` | Model ID for Anthropic |
 | `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Ollama endpoint |
 | `OLLAMA_MODEL` | `llama3` | Local model name |
 | `LLM_MAX_RETRIES` | `3` | Retry attempts per LLM call |
-| `LLM_BASE_BACKOFF` | `2.0` | Exponential backoff base (seconds) |
+| `LLM_BASE_BACKOFF` | `2.0` | Exponential backoff base (seconds) with 429 Retry-After support |
 | `FRONTEND_ORIGIN` | `http://localhost:3000` | CORS allowed origin |
 
 ### Frontend (`frontend/.env.local`)
@@ -174,14 +178,21 @@ Criterion scores are merged using category-specific weights to give each special
 
 ### Reconciliation Trigger
 
-If the variance between judges on a single criterion exceeds **20%** of its max score:
+If the variance between judges on a single criterion exceeds **15%** of its max score:
 
 ```
-Δ_crit = max(S_A, S_B, S_C) - min(S_A, S_B, S_C)
-Trigger if: Δ_crit / MaxScore_crit > 0.20
+Delta_crit = max(S_A, S_B, S_C) - min(S_A, S_B, S_C)
+Trigger arbitration if: Delta_crit / MaxScore_crit > 0.15
 ```
 
 Agent D sends a targeted arbitration prompt with the conflicting scorecards and delivers an authoritative reconciled score.
+
+### Deterministic Evidence Grounding
+
+Instead of relying on inaccurate LLM character offset calculations:
+- Judges extract verbatim text snippets (`quote_text`).
+- Python post-processing locates exact `char_start` and `char_end` coordinates using substring matching with whitespace-normalization fallback.
+- Offsets are verified deterministically before inclusion in the final consensus scorecard.
 
 ---
 
@@ -198,32 +209,32 @@ Agent D sends a targeted arbitration prompt with the conflicting scorecards and 
 ```
 RubricJudge/
 ├── backend/
-│   ├── main.py                    # FastAPI app + SSE endpoints
+│   ├── main.py                    # FastAPI app + SSE endpoints + DB lifespan
 │   ├── models.py                  # Pydantic v2 data contracts
-│   ├── requirements.txt
+│   ├── requirements.txt           # Python dependencies (fastapi, aiosqlite, etc.)
 │   ├── .env.example
 │   ├── services/
-│   │   ├── llm_client.py          # Async LLM wrapper (OpenAI/Anthropic/Ollama)
+│   │   ├── llm_client.py          # Multi-key round-robin rotation & retry backoff
 │   │   ├── rubric_parser.py       # Agent 0: Rubric normalisation
-│   │   ├── preprocessor.py        # Deterministic pre-processor
-│   │   └── evaluators.py          # Agents A, B, C, D
+│   │   ├── preprocessor.py        # Deterministic document pre-processor
+│   │   └── evaluators.py          # Agents A, B, C, D + quote verification
 │   └── utils/
 │       ├── document_loader.py     # PDF/DOCX text extraction
-│       └── job_store.py           # TTL-eviction job store
+│       └── job_store.py           # aiosqlite persistent job store + SSE queue
 └── frontend/
     ├── app/
-    │   ├── layout.tsx             # Root layout (fonts, metadata)
+    │   ├── layout.tsx             # Root layout
     │   ├── page.tsx               # State machine orchestrator
-    │   └── globals.css            # Design system tokens + animations
+    │   └── globals.css            # Academic design tokens and styles
     ├── components/
     │   ├── InputPanel.tsx         # Two-column input + file upload
     │   ├── AgentStatusTracker.tsx # Real-time SSE progress UI
-    │   ├── ResultsDashboard.tsx   # Score + tabs + export
-    │   ├── CriterionCard.tsx      # Collapsible evidence card
+    │   ├── ResultsDashboard.tsx   # Score summary, criteria breakdown, export
+    │   ├── CriterionCard.tsx      # Evidence quotes, jury scores, questions
     │   ├── RadarChart.tsx         # Recharts radar chart
-    │   └── RevisionChecklist.tsx  # Priority checklist + questions
+    │   └── RevisionChecklist.tsx  # Prioritized actionable revisions
     ├── lib/
-    │   └── types.ts               # TypeScript types + sample data
+    │   └── types.ts               # Shared TypeScript data contracts
     └── .env.local
 ```
 
@@ -231,4 +242,4 @@ RubricJudge/
 
 ## License
 
-MIT — built for educational diagnostic use only.
+MIT - built for educational diagnostic use only.

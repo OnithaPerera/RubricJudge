@@ -56,14 +56,14 @@ function exportMarkdown(report: FinalConsensusReport): void {
     `> ${report.disclaimer}`,
     ``,
     `## Overall Score`,
-    `- **Estimated Score:** ${report.estimated_overall_score} / ${report.max_possible_score} (${report.percentage.toFixed(1)}%)`,
+    `- **Estimated Score:** ${report.raw_points} / ${report.max_possible_points} (${report.overall_percentage.toFixed(1)}%)`,
     `- **Letter Grade:** ${report.letter_grade}`,
     ``,
     `## Top Strengths`,
     ...report.top_strengths.map((s) => `- ${s}`),
     ``,
     `## Priority Improvements`,
-    ...report.priority_improvements.map((s, i) => `${i + 1}. ${s}`),
+    ...report.priority_revisions.map((s: string, i: number) => `${i + 1}. ${s}`),
     ``,
     `## Guiding Questions for Revision`,
     ...report.guiding_questions_for_revision.map((q, i) => `**Q${i + 1}.** ${q}`),
@@ -72,11 +72,11 @@ function exportMarkdown(report: FinalConsensusReport): void {
   ];
 
   report.criteria_breakdown.forEach((c) => {
-    lines.push(`### ${c.criterion_title} — ${c.final_score.toFixed(1)}/${c.max_score} (${c.percentage.toFixed(0)}%)`);
+    lines.push(`### ${c.criterion_title} - ${c.assigned_score.toFixed(1)}/${c.max_score} (${c.percentage.toFixed(0)}%)`);
     if (c.critique) lines.push(`**Critique:** ${c.critique}`);
-    if (c.actionable_revision_prompts.length) {
+    if (c.actionable_questions.length) {
       lines.push(`**Revision Prompts:**`);
-      c.actionable_revision_prompts.forEach((p) => lines.push(`- ${p}`));
+      c.actionable_questions.forEach((p) => lines.push(`- ${p}`));
     }
     lines.push("");
   });
@@ -96,7 +96,7 @@ export default function ResultsDashboard({ report, onReset, draftText }: Results
   const stats = report.deterministic_stats;
 
   const circumference = 2 * Math.PI * 45; // r=45
-  const strokeDashoffset = circumference - (report.percentage / 100) * circumference;
+  const strokeDashoffset = circumference - (report.overall_percentage / 100) * circumference;
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 py-8">
@@ -143,7 +143,7 @@ export default function ResultsDashboard({ report, onReset, draftText }: Results
                 {report.letter_grade}
               </span>
               <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                {report.percentage.toFixed(0)}%
+                {report.overall_percentage.toFixed(0)}%
               </span>
             </div>
           </div>
@@ -153,10 +153,10 @@ export default function ResultsDashboard({ report, onReset, draftText }: Results
             <div className="flex flex-wrap gap-3 mb-4">
               <div className="px-4 py-2 rounded-xl" style={{ background: `${gradeStyle.color}1a`, border: `1px solid ${gradeStyle.color}33` }}>
                 <span style={{ fontSize: 22, fontWeight: 800, color: gradeStyle.color, fontFamily: "var(--font-display)" }}>
-                  {report.estimated_overall_score.toFixed(1)}
+                  {report.raw_points.toFixed(1)}
                 </span>
                 <span style={{ fontSize: 14, color: "var(--text-muted)", marginLeft: 4 }}>
-                  / {report.max_possible_score} pts
+                  / {report.max_possible_points} pts
                 </span>
               </div>
             </div>
@@ -173,7 +173,7 @@ export default function ResultsDashboard({ report, onReset, draftText }: Results
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <StatPill label="Words" value={stats.word_count} icon={FileText} />
               <StatPill label="Citations" value={stats.citation_count} icon={BarChart2} />
-              <StatPill label="Sections" value={stats.sections_detected.length || "—"} icon={TrendingUp} />
+              <StatPill label="Sections" value={stats.sections_detected.length || "-"} icon={TrendingUp} />
               <StatPill
                 label="Headers"
                 value={stats.has_section_headers ? "✓ Present" : "✗ Missing"}

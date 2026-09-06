@@ -1,7 +1,20 @@
 /**
- * RubricJudge — Shared TypeScript Types
- * Mirrors the Pydantic v2 models from backend/models.py
+ * RubricJudge -- Shared TypeScript Types (Phase 1 Refactor)
+ * Mirrors the Pydantic v2 models from backend/models.py.
+ *
+ * IMPORTANT: Keep this file in sync with backend/models.py whenever
+ * data contracts change. Field names use snake_case to match the
+ * JSON serialisation from FastAPI.
  */
+
+// ---------------------------------------------------------------------------
+// Rubric Structures
+// ---------------------------------------------------------------------------
+
+export interface CriterionLevel {
+  label: string;
+  description: string;
+}
 
 export interface RubricCriterion {
   id: string;
@@ -9,8 +22,12 @@ export interface RubricCriterion {
   description: string;
   weight_percentage: number;
   max_score: number;
-  levels: Record<string, string>;
-  category: "content_argumentation" | "structure_formatting" | "task_fulfillment" | "other";
+  levels: CriterionLevel[];
+  category:
+    | "content_argumentation"
+    | "structure_formatting"
+    | "task_fulfillment"
+    | "other";
 }
 
 export interface NormalizedRubric {
@@ -18,6 +35,10 @@ export interface NormalizedRubric {
   total_points: number;
   criteria: RubricCriterion[];
 }
+
+// ---------------------------------------------------------------------------
+// Deterministic Pre-Processor Stats
+// ---------------------------------------------------------------------------
 
 export interface DeterministicStats {
   word_count: number;
@@ -30,6 +51,59 @@ export interface DeterministicStats {
   sections_detected: string[];
 }
 
+// ---------------------------------------------------------------------------
+// Evidence Quoting (char offsets verified server-side)
+// ---------------------------------------------------------------------------
+
+export interface EvidenceQuote {
+  /** The verbatim quote text from the student draft. */
+  quote_text: string;
+  /**
+   * 0-indexed start position in the draft text.
+   * -1 means the quote could not be located in the draft.
+   */
+  char_start: number;
+  /**
+   * 0-indexed exclusive end position in the draft text.
+   * -1 means the quote could not be located in the draft.
+   */
+  char_end: number;
+  /**
+   * 1.0 = exact match, 0.7 = normalised match,
+   * 0.5 = case-insensitive match, 0.0 = not found.
+   */
+  confidence_score: number;
+  /** Optional note describing why this passage was cited as evidence. */
+  context_note: string;
+}
+
+// ---------------------------------------------------------------------------
+// Per-Criterion Consensus Evaluation
+// ---------------------------------------------------------------------------
+
+export interface CriterionEvaluation {
+  criterion_id: string;
+  criterion_title: string;
+  assigned_score: number;
+  max_score: number;
+  /** assigned_score / max_score * 100, rounded to 1 decimal. */
+  percentage: number;
+  /** Individual raw scores from each judge, keyed by agent name. */
+  jury_scores: Record<string, number>;
+  was_arbitrated: boolean;
+  arbitration_notes: string | null;
+  /** Verified evidence quotes with character offsets. */
+  evidence: EvidenceQuote[];
+  critique: string;
+  /** Guiding questions only, never replacement text. */
+  actionable_questions: string[];
+  confidence: number;
+}
+
+/**
+ * @deprecated Use CriterionEvaluation instead.
+ * Kept temporarily so existing components compile during Phase 2 migration.
+ */
 export interface ReconciledCriterionScore {
   criterion_id: string;
   criterion_title: string;
@@ -45,20 +119,29 @@ export interface ReconciledCriterionScore {
   actionable_revision_prompts: string[];
 }
 
+// ---------------------------------------------------------------------------
+// Final Consensus Report
+// ---------------------------------------------------------------------------
+
 export interface FinalConsensusReport {
-  estimated_overall_score: number;
-  max_possible_score: number;
-  percentage: number;
+  raw_points: number;
+  max_possible_points: number;
+  /** raw_points / max_possible_points * 100, rounded to 1 decimal. */
+  overall_percentage: number;
   letter_grade: string;
   deterministic_stats: DeterministicStats;
-  criteria_breakdown: ReconciledCriterionScore[];
+  criteria_breakdown: CriterionEvaluation[];
   consensus_discrepancies: string[];
   top_strengths: string[];
-  priority_improvements: string[];
+  priority_revisions: string[];
   guiding_questions_for_revision: string[];
   agents_used: string[];
   disclaimer: string;
 }
+
+// ---------------------------------------------------------------------------
+// SSE / Streaming Events
+// ---------------------------------------------------------------------------
 
 export type PipelineStage =
   | "parsing_rubric"
@@ -80,6 +163,10 @@ export interface StreamProgressEvent {
   error?: string;
 }
 
+// ---------------------------------------------------------------------------
+// UI-Only Types
+// ---------------------------------------------------------------------------
+
 export interface AgentStatus {
   name: string;
   label: string;
@@ -87,15 +174,30 @@ export interface AgentStatus {
   message?: string;
 }
 
+// ---------------------------------------------------------------------------
+// API Response Types
+// ---------------------------------------------------------------------------
+
 export interface EvaluationJobResponse {
   job_id: string;
   message: string;
   stream_url: string;
 }
 
-// Sample data for quick testing
+export interface JobStatusResponse {
+  job_id: string;
+  status: "pending" | "running" | "completed" | "failed";
+  result?: FinalConsensusReport;
+  created_at: number;
+  updated_at: number;
+}
+
+// ---------------------------------------------------------------------------
+// Sample Data (for quick testing)
+// ---------------------------------------------------------------------------
+
 export const SAMPLE_RUBRIC = `
-Assignment: Critical Analysis Essay – Climate Change Policy
+Assignment: Critical Analysis Essay -- Climate Change Policy
 
 1. Thesis & Argument (25 points): Student presents a clear, specific, and arguable thesis statement. The argument is logically structured and consistently maintained throughout the essay.
    - Excellent (23-25): Compelling, nuanced thesis with sophisticated argumentation

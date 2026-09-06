@@ -1,14 +1,15 @@
 """
-RubricJudge — Async LLM Client
+RubricJudge - Async LLM Client (Phase 1 Refactor)
 
 Provides a unified async interface supporting:
-  - Google Gemini (free tier via google-genai SDK)  ← DEFAULT
+  - Google Gemini (free tier via google-genai SDK with multi-key round-robin)
   - OpenAI GPT-4o
   - Anthropic Claude (with prompt caching)
   - Ollama (local fallback)
 
 Key features:
 - Structured JSON outputs via each provider's native schema mechanism.
+- Multi-key support for Gemini: supply comma-separated keys in GEMINI_API_KEY.
 - Per-request exponential backoff with jitter on rate-limit and transient errors.
 - Prompt injection hardening: all user inputs are wrapped in XML delimiters.
 """
@@ -20,7 +21,7 @@ import logging
 import os
 import random
 import re
-from typing import Any, Optional, Type, TypeVar
+from typing import Any, Optional, Type, TypeVar, List, Dict
 
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -59,17 +60,6 @@ def get_max_retries() -> int:
 
 def get_base_backoff() -> float:
     return float(os.getenv("LLM_BASE_BACKOFF", "2.0"))
-
-
-# Legacy constants (fallback aliases)
-GEMINI_MODEL = get_gemini_model()
-DEFAULT_MODEL = get_openai_model()
-ANTHROPIC_MODEL = get_anthropic_model()
-OLLAMA_MODEL = get_ollama_model()
-OLLAMA_BASE_URL = get_ollama_base_url()
-MAX_RETRIES = get_max_retries()
-BASE_BACKOFF = get_base_backoff()
-LLM_PROVIDER = get_llm_provider()
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +115,13 @@ async def _with_retry(coro_fn, *args, max_retries: Optional[int] = None, **kwarg
             if any(k in err_str for k in ("authentication", "invalid_api_key", "permission")):
                 raise
             if attempt < limit:
+                # Wait Retry-After header duration if present, otherwise exponential backoff
                 wait = base_backoff ** attempt + random.uniform(0, 1)
+                if hasattr(exc, "headers") and "Retry-After" in exc.headers:  # type: ignore
+                    try:
+                        wait = float(exc.headers["Retry-After"])  # type: ignore
+                    except (ValueError, TypeError):
+                        pass
                 logger.warning(
                     "LLM call failed (attempt %d/%d): %s. Retrying in %.1fs…",
                     attempt + 1, limit, exc, wait,
@@ -135,7 +131,7 @@ async def _with_retry(coro_fn, *args, max_retries: Optional[int] = None, **kwarg
 
 
 # ---------------------------------------------------------------------------
-# Gemini client (google-genai SDK)
+# Gemini client (google-genai SDK) - Multi-key support
 # ---------------------------------------------------------------------------
 
 FALLBACK_GEMINI_MODELS = [
@@ -145,6 +141,39 @@ FALLBACK_GEMINI_MODELS = [
     "gemini-3.8-flash",
     "gemini-flash-latest",
 ]
+
+_gemini_key_index: int = 0
+_gemini_clients: Dict[str, Any] = {}
+
+def _get_next_gemini_client() -> tuple[Any, str]:
+    """Round-robin API keys and return (client, masked_key)."""
+    global _gemini_key_index
+    from google import genai  # type: ignore
+
+    keys_str = os.environ.get("GEMINI_API_KEY", "")
+    if not keys_str:
+        raise ValueError(
+            "GEMINI_API_KEY is not set. "
+            "Get a free key at https://aistudio.google.com/apikey"
+        )
+    
+    # Split by comma and strip whitespace
+    keys: List[str] = [k.strip() for k in keys_str.split(",") if k.strip()]
+    if not keys:
+        raise ValueError("GEMINI_API_KEY contains no valid keys.")
+
+    # Atomic-ish round-robin (good enough for async single-process)
+    current_key = keys[_gemini_key_index % len(keys)]
+    _gemini_key_index = (_gemini_key_index + 1) % len(keys)
+
+    # Mask key for logging (e.g., AIza...1234)
+    masked_key = f"{current_key[:4]}...{current_key[-4:]}" if len(current_key) > 8 else "***"
+
+    if current_key not in _gemini_clients:
+        _gemini_clients[current_key] = genai.Client(api_key=current_key)
+    
+    return _gemini_clients[current_key], masked_key
+
 
 async def _call_gemini(
     system_prompt: str,
@@ -157,22 +186,15 @@ async def _call_gemini(
     Call Google Gemini using the google-genai 2.x native async client.
     Uses JSON response_mime_type and response_schema for strict structured output.
     Automatically fails over to alternative flash models if 429 quota is reached.
+    Automatically round-robins across multiple API keys.
     """
-    from google import genai  # type: ignore
     from google.genai import types as genai_types  # type: ignore
 
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError(
-            "GEMINI_API_KEY is not set. "
-            "Get a free key at https://aistudio.google.com/apikey"
-        )
+    client, masked_key = _get_next_gemini_client()
 
     primary_model = model or get_gemini_model()
     # List models to try: primary model first, followed by available fallbacks
     models_to_try = [primary_model] + [m for m in FALLBACK_GEMINI_MODELS if m != primary_model]
-
-    client = genai.Client(api_key=api_key)
 
     config_kwargs: dict[str, Any] = {
         "temperature": temperature,
@@ -197,7 +219,8 @@ async def _call_gemini(
             err_str = str(exc).lower()
             if "resource_exhausted" in err_str or "429" in err_str or "quota" in err_str:
                 logger.warning(
-                    "Gemini quota exhausted for model '%s'. Failing over to next model…",
+                    "Gemini quota exhausted for key %s, model '%s'. Failing over to next model…",
+                    masked_key,
                     attempt_model,
                 )
                 last_error = exc
@@ -209,8 +232,6 @@ async def _call_gemini(
     raise RuntimeError("No Gemini models available.")
 
 
-
-
 # ---------------------------------------------------------------------------
 # OpenAI client
 # ---------------------------------------------------------------------------
@@ -219,7 +240,7 @@ async def _call_openai(
     system_prompt: str,
     user_message: str,
     response_schema: Optional[dict] = None,
-    model: str = DEFAULT_MODEL,
+    model: Optional[str] = None,
     temperature: float = 0.2,
 ) -> str:
     from openai import AsyncOpenAI  # type: ignore
@@ -227,7 +248,7 @@ async def _call_openai(
     client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
     kwargs: dict[str, Any] = dict(
-        model=model,
+        model=model or get_openai_model(),
         temperature=temperature,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -258,7 +279,7 @@ async def _call_openai(
 async def _call_anthropic(
     system_prompt: str,
     user_message: str,
-    model: str = ANTHROPIC_MODEL,
+    model: Optional[str] = None,
     temperature: float = 0.2,
 ) -> str:
     import anthropic  # type: ignore
@@ -267,7 +288,7 @@ async def _call_anthropic(
 
     # Use cache_control for the system prompt (prompt caching)
     response = await client.messages.create(
-        model=model,
+        model=model or get_anthropic_model(),
         max_tokens=4096,
         temperature=temperature,
         system=[
@@ -289,15 +310,15 @@ async def _call_anthropic(
 async def _call_ollama(
     system_prompt: str,
     user_message: str,
-    model: str = OLLAMA_MODEL,
+    model: Optional[str] = None,
     temperature: float = 0.2,
 ) -> str:
     from openai import AsyncOpenAI  # type: ignore
 
     # Ollama exposes an OpenAI-compatible endpoint
-    client = AsyncOpenAI(base_url=OLLAMA_BASE_URL, api_key="ollama")
+    client = AsyncOpenAI(base_url=get_ollama_base_url(), api_key="ollama")
     response = await client.chat.completions.create(
-        model=model,
+        model=model or get_ollama_model(),
         temperature=temperature,
         response_format={"type": "json_object"},
         messages=[
@@ -390,4 +411,3 @@ async def llm_text_call(
             return response.choices[0].message.content or ""
 
     return await _with_retry(_do_call)
-

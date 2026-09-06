@@ -1,8 +1,8 @@
 """
-RubricJudge — FastAPI Application
+RubricJudge -- FastAPI Application (Phase 1 Refactor)
 
 Endpoints:
-  POST /api/evaluate          Accept text or file upload, kick off background pipeline
+  POST /api/evaluate                   Accept text or file upload, kick off background pipeline
   GET  /api/evaluate/stream/{job_id}   SSE stream of progress events
   GET  /api/jobs/{job_id}/status       Quick polling endpoint
 
@@ -54,18 +54,20 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Start background cleanup task on app startup."""
+    """Initialise the persistent job store and start cleanup on app startup."""
+    await job_store.init_db()
     cleanup_task = asyncio.create_task(job_store.run_cleanup_loop(interval_seconds=300))
     logger.info("RubricJudge API starting up.")
     yield
     cleanup_task.cancel()
+    await job_store.close()
     logger.info("RubricJudge API shutting down.")
 
 
 app = FastAPI(
     title="RubricJudge API",
     description="Multi-agent AI-powered academic assignment evaluation platform.",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -125,10 +127,10 @@ async def _run_pipeline(
 ) -> None:
     """Full 4-phase pipeline executed as a background asyncio task."""
     try:
-        job_store.set_status(job_id, "running")
+        await job_store.set_status(job_id, "running")
 
         # Phase 1a: Parse rubric
-        await _push_progress(job_id, "parsing_rubric", 10, "Parsing and normalising rubric…")
+        await _push_progress(job_id, "parsing_rubric", 10, "Parsing and normalising rubric...")
         rubric = await parse_rubric(rubric_text, assignment_title)
         await _push_progress(
             job_id, "parsing_rubric", 20,
@@ -136,7 +138,7 @@ async def _run_pipeline(
         )
 
         # Phase 1b: Deterministic pre-processing
-        await _push_progress(job_id, "preflight_checks", 25, "Running preflight checks on draft…")
+        await _push_progress(job_id, "preflight_checks", 25, "Running preflight checks on draft...")
         stats = preprocess_draft(draft_text)
         await _push_progress(
             job_id, "preflight_checks", 35,
@@ -155,7 +157,7 @@ async def _run_pipeline(
 
         await _push_progress(
             job_id, "running_specialist_judges", 40,
-            "Launching specialist judge committee (Agent A, B, C)…",
+            "Launching specialist judge committee (Agent A, B, C)...",
         )
 
         report = await run_evaluation_pipeline(
@@ -166,7 +168,7 @@ async def _run_pipeline(
         )
 
         # Phase 4: Done
-        job_store.set_result(job_id, report)
+        await job_store.set_result(job_id, report)
         await _push_progress(
             job_id, "completed", 100,
             "Evaluation complete. Report ready.",
@@ -175,10 +177,10 @@ async def _run_pipeline(
 
     except asyncio.CancelledError:
         logger.info("Job %s cancelled (client disconnected).", job_id)
-        job_store.set_status(job_id, "failed")
+        await job_store.set_status(job_id, "failed")
     except Exception as exc:
         logger.exception("Pipeline error for job %s: %s", job_id, exc)
-        job_store.set_status(job_id, "failed")
+        await job_store.set_status(job_id, "failed")
         await _push_progress(
             job_id, "failed", 0,
             f"Evaluation failed: {exc}",
@@ -227,7 +229,7 @@ async def start_evaluation(
             detail="Draft is too short (minimum 30 words). Please submit a more complete assignment draft.",
         )
 
-    job_id = job_store.create_job()
+    job_id = await job_store.create_job()
     logger.info("Created job %s (%d word draft, %d char rubric).", job_id, len(resolved_draft.split()), len(resolved_rubric))
 
     # Launch evaluation as a monitored background task
@@ -251,7 +253,7 @@ async def stream_evaluation(job_id: str, request: Request) -> StreamingResponse:
     On disconnect, the background evaluation task is cancelled to avoid
     wasting API tokens.
     """
-    if not job_store.job_exists(job_id):
+    if not await job_store.job_exists(job_id):
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
 
     queue = job_store.get_queue(job_id)
@@ -263,7 +265,7 @@ async def stream_evaluation(job_id: str, request: Request) -> StreamingResponse:
             # Keep-alive comment every 15 s to prevent nginx/proxy timeouts
             while True:
                 if await request.is_disconnected():
-                    logger.info("SSE client disconnected for job %s — cancelling task.", job_id)
+                    logger.info("SSE client disconnected for job %s -- cancelling task.", job_id)
                     job_store.cancel_job(job_id)
                     return
 
@@ -295,21 +297,32 @@ async def stream_evaluation(job_id: str, request: Request) -> StreamingResponse:
 @app.get("/api/jobs/{job_id}/status", response_model=JobStatusResponse)
 async def get_job_status(job_id: str) -> JobStatusResponse:
     """Quick polling endpoint for clients that can't use SSE."""
-    if not job_store.job_exists(job_id):
+    if not await job_store.job_exists(job_id):
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
+
+    status = await job_store.get_status(job_id) or "pending"
+    result_data = await job_store.get_result(job_id)
+
+    # Reconstruct the FinalConsensusReport from stored JSON if available.
+    result_obj = None
+    if result_data:
+        try:
+            result_obj = FinalConsensusReport.model_validate(result_data)
+        except Exception:
+            logger.warning("Could not deserialise stored result for job %s.", job_id)
 
     return JobStatusResponse(
         job_id=job_id,
-        status=job_store.get_status(job_id) or "pending",  # type: ignore[arg-type]
-        result=job_store.get_result(job_id),
-        created_at=job_store.get_created_at(job_id),
-        updated_at=job_store.get_updated_at(job_id),
+        status=status,  # type: ignore[arg-type]
+        result=result_obj,
+        created_at=await job_store.get_created_at(job_id),
+        updated_at=await job_store.get_updated_at(job_id),
     )
 
 
 @app.get("/api/health")
 async def health_check() -> dict:
-    return {"status": "ok", "version": "1.0.0"}
+    return {"status": "ok", "version": "2.0.0"}
 
 
 # ---------------------------------------------------------------------------

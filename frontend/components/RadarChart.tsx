@@ -8,10 +8,10 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
-import { ReconciledCriterionScore } from "@/lib/types";
+import { CriterionEvaluation } from "@/lib/types";
 
 interface RadarChartProps {
-  criteria: ReconciledCriterionScore[];
+  criteria: CriterionEvaluation[];
 }
 
 interface CustomTooltipProps {
@@ -47,7 +47,7 @@ export default function RadarChart({ criteria }: RadarChartProps) {
         : c.criterion_title,
     fullTitle: c.criterion_title,
     percentage: c.percentage,
-    score: c.final_score,
+    score: c.assigned_score,
     max: c.max_score,
   }));
 

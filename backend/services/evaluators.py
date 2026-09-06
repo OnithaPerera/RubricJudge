@@ -1,20 +1,22 @@
 """
-RubricJudge — Multi-Agent Evaluation Pipeline (Phase 2 & 3)
+RubricJudge -- Multi-Agent Evaluation Pipeline (Phase 1 Refactor)
 
 Agents:
-  A — Rubric Alignment Judge     (G-Eval CoT, 5 steps)
-  B — Critical Reasoning Judge   (Devil's advocate / depth)
-  C — Style & Citations Auditor  (tone, structure, references)
-  D — Master Consensus Engine    (weighted merge + reconciliation)
+  A -- Rubric Alignment Judge     (G-Eval CoT, 5 steps)
+  B -- Critical Reasoning Judge   (Devil's advocate / depth)
+  C -- Style & Citations Auditor  (tone, structure, references)
+  D -- Master Consensus Engine    (weighted merge + reconciliation)
 
 Key design decisions:
-- asyncio.gather(return_exceptions=True) so one failing judge doesn't
+- asyncio.gather(return_exceptions=True) so one failing judge does not
   abort the whole pipeline.
 - Agent D fires a reconciliation prompt when score variance on a single
-  criterion exceeds 20 % (Δ / max_score > 0.20).
+  criterion exceeds 15% (delta / max_score > 0.15).
 - Anti-ghostwriting filter strips any suggestion that starts with
   verbatim replacement text.
 - All user inputs are enclosed in XML tags to prevent prompt injection.
+- Evidence quotes are verified server-side with deterministic char offsets
+  via verify_evidence_quotes() in models.py.
 """
 from __future__ import annotations
 
@@ -25,20 +27,24 @@ from typing import Dict, List, Optional, Tuple
 
 from models import (
     AgentEvaluationResult,
+    CriterionEvaluation,
     CriterionScore,
+    DeterministicStats,
+    EvidenceQuote,
     FinalConsensusReport,
     NormalizedRubric,
-    ReconciledCriterionScore,
     RubricCriterion,
-    DeterministicStats,
+    verify_evidence_quotes,
 )
 from services.llm_client import llm_json_call, llm_text_call
 
 logger = logging.getLogger(__name__)
 
+# Arbitration threshold: reconcile when normalised delta exceeds this value.
+ARBITRATION_THRESHOLD = 0.15
 
 # ---------------------------------------------------------------------------
-# Agent weighting matrix (criterion category → agent weight)
+# Agent weighting matrix (criterion category -> agent weight)
 # ---------------------------------------------------------------------------
 
 # Format: {category: {agent_name: weight}}
@@ -73,9 +79,9 @@ def _sanitise_suggestion(suggestion: str) -> Optional[str]:
         if pattern.match(stripped):
             logger.warning("Ghostwriting suggestion filtered: %s", stripped[:80])
             return None
-    # Flag excessively long single-sentence suggestions
+    # Flag excessively long single-sentence suggestions (>60 words).
     if len(stripped.split()) > 60 and stripped.count(".") <= 1:
-        logger.warning("Overly long suggestion may be ghostwriting — filtered.")
+        logger.warning("Overly long suggestion may be ghostwriting -- filtered.")
         return None
     return stripped
 
@@ -93,7 +99,7 @@ def _rubric_summary(rubric: NormalizedRubric) -> str:
     """Build a compact rubric summary string for agent prompts."""
     lines = [f"Assignment: {rubric.assignment_title}", f"Total Points: {rubric.total_points}", ""]
     for c in rubric.criteria:
-        lines.append(f"  [{c.id}] {c.title} — {c.max_score} pts ({c.weight_percentage}%)")
+        lines.append(f"  [{c.id}] {c.title} -- {c.max_score} pts ({c.weight_percentage}%)")
         if c.description:
             lines.append(f"         Description: {c.description}")
         if c.levels:
@@ -104,7 +110,7 @@ def _rubric_summary(rubric: NormalizedRubric) -> str:
                     for item in c.levels
                 )
             elif isinstance(c.levels, dict):
-                levels_str = " | ".join(f"{k}: {v[:60]}…" if len(v) > 60 else f"{k}: {v}" for k, v in c.levels.items())
+                levels_str = " | ".join(f"{k}: {v[:60]}" if len(v) > 60 else f"{k}: {v}" for k, v in c.levels.items())
             else:
                 levels_str = str(c.levels)
             lines.append(f"         Levels: {levels_str}")
@@ -142,7 +148,7 @@ def _make_criterion_scores_schema() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Agent A — Rubric Alignment Judge (G-Eval CoT)
+# Agent A -- Rubric Alignment Judge (G-Eval CoT)
 # ---------------------------------------------------------------------------
 
 _AGENT_A_SYSTEM = """
@@ -169,7 +175,7 @@ async def run_agent_a(
     rubric: NormalizedRubric,
     draft_text: str,
 ) -> AgentEvaluationResult:
-    """Rubric Alignment Judge — strict criterion-by-criterion G-Eval."""
+    """Rubric Alignment Judge -- strict criterion-by-criterion G-Eval."""
     rubric_str = _rubric_summary(rubric)
     sanitised_draft = draft_text.replace("</student_submission>", "[FILTERED]")
 
@@ -202,7 +208,7 @@ Return JSON with: agent_name, overall_notes, criterion_scores[].
 
 
 # ---------------------------------------------------------------------------
-# Agent B — Critical Reasoning & Depth Judge
+# Agent B -- Critical Reasoning & Depth Judge
 # ---------------------------------------------------------------------------
 
 _AGENT_B_SYSTEM = """
@@ -226,7 +232,7 @@ async def run_agent_b(
     rubric: NormalizedRubric,
     draft_text: str,
 ) -> AgentEvaluationResult:
-    """Critical Reasoning & Depth Judge — devil's advocate."""
+    """Critical Reasoning & Depth Judge -- devil's advocate."""
     rubric_str = _rubric_summary(rubric)
     sanitised_draft = draft_text.replace("</student_submission>", "[FILTERED]")
 
@@ -259,7 +265,7 @@ Return JSON with: agent_name ("Agent B"), overall_notes, criterion_scores[].
 
 
 # ---------------------------------------------------------------------------
-# Agent C — Style, Structure & Citations Auditor
+# Agent C -- Style, Structure & Citations Auditor
 # ---------------------------------------------------------------------------
 
 _AGENT_C_SYSTEM = """
@@ -268,7 +274,7 @@ You are "Agent C: Academic Style & Citations Auditor", an expert in academic wri
 Your task is to evaluate:
 - Academic tone (formal register, avoidance of colloquialisms, passive/active voice balance)
 - Structural coherence (logical flow between paragraphs, transitions, clear argument arc)
-- Reference formatting consistency (APA/MLA/Chicago — flag inconsistencies)
+- Reference formatting consistency (APA/MLA/Chicago -- flag inconsistencies)
 - Citation density relative to claims made (unsupported claims vs. over-cited obvious facts)
 - Clarity and precision of language (ambiguous pronouns, vague qualifiers, run-on sentences)
 
@@ -327,7 +333,8 @@ def _compute_variance(
     Compute normalised score variance for a criterion across all active agents.
 
     Returns:
-        (normalised_delta, {agent_name: score}) — normalised_delta ∈ [0, 1]
+        (normalised_delta, {agent_name: score})
+        normalised_delta is in [0, 1].
     """
     scores_by_agent: Dict[str, float] = {}
     for agent_result in agent_results:
@@ -387,7 +394,7 @@ async def _reconcile_criterion(
                 scorecard_lines.append(
                     f"{agent_result.agent_name}: {cs.score}/{criterion.max_score} ({pct}%)\n"
                     f"  Evidence: {cs.evidence_quotes[:2]}\n"
-                    f"  Critique: {cs.critique[:200]}…"
+                    f"  Critique: {cs.critique[:200]}"
                 )
                 break
 
@@ -426,11 +433,11 @@ Deliver the authoritative reconciled score.
         logger.error("Arbitration failed for criterion '%s': %s", criterion.id, exc)
         # Fallback: use weighted mean of available scores
         fallback_score = sum(scores_by_agent.values()) / len(scores_by_agent)
-        return fallback_score, "Arbitration unavailable — using mean score.", []
+        return fallback_score, "Arbitration unavailable -- using mean score.", []
 
 
 # ---------------------------------------------------------------------------
-# Agent D — Master Consensus & Synthesizer
+# Agent D -- Master Consensus & Synthesizer
 # ---------------------------------------------------------------------------
 
 _SYNTHESIS_SYSTEM = """
@@ -451,7 +458,7 @@ STRICT RULES:
 Respond ONLY with JSON:
 {
   "top_strengths": ["...", "...", "..."],
-  "priority_improvements": ["...", "...", "...", "...", "..."],
+  "priority_revisions": ["...", "...", "...", "...", "..."],
   "guiding_questions_for_revision": ["...?", "...?", "...?"],
   "consensus_discrepancies": ["..."],
   "overall_synthesis_note": "..."
@@ -460,7 +467,7 @@ Respond ONLY with JSON:
 
 async def run_agent_d_synthesis(
     rubric: NormalizedRubric,
-    criteria_breakdown: List[ReconciledCriterionScore],
+    criteria_breakdown: List[CriterionEvaluation],
     agent_results: List[AgentEvaluationResult],
 ) -> Dict:
     """Run the synthesis pass to extract strengths, improvements, and discrepancies."""
@@ -468,13 +475,13 @@ async def run_agent_d_synthesis(
     for rc in criteria_breakdown:
         scorecard_summary.append(
             f"[{rc.criterion_id}] {rc.criterion_title}: "
-            f"{rc.final_score}/{rc.max_score} ({rc.percentage:.0f}%)"
-            + (" [RECONCILED]" if rc.was_reconciled else "")
+            f"{rc.assigned_score}/{rc.max_score} ({rc.percentage:.0f}%)"
+            + (" [ARBITRATED]" if rc.was_arbitrated else "")
         )
 
     discrepancies = [
-        f"'{rc.criterion_title}': agents scored {rc.agent_scores}" 
-        for rc in criteria_breakdown if rc.was_reconciled
+        f"'{rc.criterion_title}': agents scored {rc.jury_scores}"
+        for rc in criteria_breakdown if rc.was_arbitrated
     ]
 
     all_critiques = []
@@ -494,7 +501,7 @@ Criterion Scorecard:
 Judge Critiques (summary):
 {chr(10).join(all_critiques[:20])}
 
-Discrepancies (criteria where judges disagreed >20%):
+Discrepancies (criteria where judges disagreed >15%):
 {chr(10).join(discrepancies) or 'None detected.'}
 
 Synthesise the top strengths, improvements, and guiding questions.
@@ -503,7 +510,7 @@ Synthesise the top strengths, improvements, and guiding questions.
     from pydantic import BaseModel as _Base
     class _SynthesisResult(_Base):
         top_strengths: List[str]
-        priority_improvements: List[str]
+        priority_revisions: List[str]
         guiding_questions_for_revision: List[str]
         consensus_discrepancies: List[str]
         overall_synthesis_note: str
@@ -517,7 +524,7 @@ Synthesise the top strengths, improvements, and guiding questions.
         )
         return {
             "top_strengths": result.top_strengths[:5],
-            "priority_improvements": _filter_suggestions(result.priority_improvements)[:5],
+            "priority_revisions": _filter_suggestions(result.priority_revisions)[:5],
             "guiding_questions_for_revision": result.guiding_questions_for_revision[:5],
             "consensus_discrepancies": discrepancies or result.consensus_discrepancies,
             "overall_synthesis_note": result.overall_synthesis_note,
@@ -526,7 +533,7 @@ Synthesise the top strengths, improvements, and guiding questions.
         logger.error("Agent D synthesis failed: %s", exc)
         return {
             "top_strengths": [],
-            "priority_improvements": [],
+            "priority_revisions": [],
             "guiding_questions_for_revision": [],
             "consensus_discrepancies": discrepancies,
             "overall_synthesis_note": "Synthesis unavailable.",
@@ -572,7 +579,7 @@ async def run_evaluation_pipeline(
                             invoked as phases complete.
 
     Returns:
-        FinalConsensusReport — the authoritative multi-agent evaluation.
+        FinalConsensusReport -- the authoritative multi-agent evaluation.
     """
     async def _notify(stage: str, message: str, agent: Optional[str] = None):
         if progress_callback:
@@ -581,7 +588,7 @@ async def run_evaluation_pipeline(
     # -------------------------------------------------------------------
     # Phase 2: Parallel specialist judges
     # -------------------------------------------------------------------
-    await _notify("running_specialist_judges", "Launching Agent A, B, and C in parallel…")
+    await _notify("running_specialist_judges", "Launching Agent A, B, and C in parallel...")
 
     agent_coroutines = [
         run_agent_a(rubric, draft_text),
@@ -615,30 +622,30 @@ async def run_evaluation_pipeline(
     # -------------------------------------------------------------------
     # Phase 3: Consensus & Reconciliation
     # -------------------------------------------------------------------
-    await _notify("arbitrating_discrepancies", "Computing weighted consensus scores…")
+    await _notify("arbitrating_discrepancies", "Computing weighted consensus scores...")
 
-    criteria_breakdown: List[ReconciledCriterionScore] = []
+    criteria_breakdown: List[CriterionEvaluation] = []
 
     for criterion in rubric.criteria:
         variance, scores_by_agent = _compute_variance(criterion.id, agent_results, criterion.max_score)
 
         weights = AGENT_WEIGHTS.get(criterion.category, AGENT_WEIGHTS["other"])
-        was_reconciled = False
-        arbitration_reasoning: Optional[str] = None
+        was_arbitrated = False
+        arbitration_notes: Optional[str] = None
         arb_prompts: List[str] = []
 
-        if variance > 0.20 and len(scores_by_agent) >= 2:
+        if variance > ARBITRATION_THRESHOLD and len(scores_by_agent) >= 2:
             # Trigger reconciliation pass
             await _notify(
                 "arbitrating_discrepancies",
-                f"Variance {variance:.0%} on '{criterion.title}' — arbitrating…",
+                f"Variance {variance:.0%} on '{criterion.title}' -- arbitrating...",
             )
             recon_score, arb_reason, arb_prompts = await _reconcile_criterion(
                 criterion, scores_by_agent, agent_results, draft_text
             )
-            final_score = recon_score
-            was_reconciled = True
-            arbitration_reasoning = arb_reason
+            assigned_score = recon_score
+            was_arbitrated = True
+            arbitration_notes = arb_reason
         else:
             # Weighted average of available agent scores
             weighted_sum = 0.0
@@ -647,11 +654,12 @@ async def run_evaluation_pipeline(
                 w = weights.get(agent_name, 1.0 / len(agent_names))
                 weighted_sum += score * w
                 total_weight += w
-            final_score = weighted_sum / total_weight if total_weight > 0 else 0.0
+            assigned_score = weighted_sum / total_weight if total_weight > 0 else 0.0
 
         # Collect evidence quotes and critiques from the most confident agent
         best_agent_result: Optional[CriterionScore] = None
         best_confidence = -1.0
+        all_raw_quotes: List[str] = []
         all_suggestions: List[str] = []
         for agent_result in active_agents:
             for cs in agent_result.criterion_scores:
@@ -659,7 +667,24 @@ async def run_evaluation_pipeline(
                     if cs.confidence > best_confidence:
                         best_confidence = cs.confidence
                         best_agent_result = cs
+                    all_raw_quotes.extend(cs.evidence_quotes)
                     all_suggestions.extend(cs.suggestions)
+
+        # Deduplicate raw quotes before verification
+        seen_quotes: set = set()
+        unique_raw_quotes: List[str] = []
+        for q in all_raw_quotes:
+            q_stripped = q.strip()
+            if q_stripped and q_stripped not in seen_quotes:
+                seen_quotes.add(q_stripped)
+                unique_raw_quotes.append(q_stripped)
+
+        # Verify evidence quotes with deterministic char offsets
+        verified_evidence: List[EvidenceQuote] = verify_evidence_quotes(
+            raw_quotes=unique_raw_quotes[:10],  # cap at 10 quotes per criterion
+            draft_text=draft_text,
+            context_note=f"Evidence for criterion: {criterion.title}",
+        )
 
         # Deduplicate suggestions
         seen_suggestions: set = set()
@@ -669,22 +694,22 @@ async def run_evaluation_pipeline(
                 seen_suggestions.add(s)
                 unique_suggestions.append(s)
 
-        percentage = round(final_score / criterion.max_score * 100, 1) if criterion.max_score > 0 else 0.0
+        percentage = round(assigned_score / criterion.max_score * 100, 1) if criterion.max_score > 0 else 0.0
 
         criteria_breakdown.append(
-            ReconciledCriterionScore(
+            CriterionEvaluation(
                 criterion_id=criterion.id,
                 criterion_title=criterion.title,
-                final_score=round(final_score, 2),
+                assigned_score=round(assigned_score, 2),
                 max_score=criterion.max_score,
                 percentage=percentage,
-                agent_scores=scores_by_agent,
-                was_reconciled=was_reconciled,
-                arbitration_reasoning=arbitration_reasoning,
-                confidence=round(best_confidence, 2) if best_confidence >= 0 else 0.7,
-                evidence_quotes=best_agent_result.evidence_quotes if best_agent_result else [],
+                jury_scores=scores_by_agent,
+                was_arbitrated=was_arbitrated,
+                arbitration_notes=arbitration_notes,
+                evidence=verified_evidence,
                 critique=best_agent_result.critique if best_agent_result else "",
-                actionable_revision_prompts=unique_suggestions[:5],
+                actionable_questions=unique_suggestions[:5],
+                confidence=round(best_confidence, 2) if best_confidence >= 0 else 0.7,
             )
         )
 
@@ -694,7 +719,7 @@ async def run_evaluation_pipeline(
     # -------------------------------------------------------------------
     # Phase 4: Synthesis & Final Report
     # -------------------------------------------------------------------
-    await _notify("generating_final_report", "Agent D synthesising final report…")
+    await _notify("generating_final_report", "Agent D synthesising final report...")
     synthesis = await run_agent_d_synthesis(rubric, criteria_breakdown, agent_results)
 
     # Restore original criterion order for the report
@@ -704,20 +729,20 @@ async def run_evaluation_pipeline(
         )
     )
 
-    total_score = sum(rc.final_score for rc in criteria_breakdown)
+    total_score = sum(rc.assigned_score for rc in criteria_breakdown)
     max_possible = rubric.total_points
     percentage = round(total_score / max_possible * 100, 1) if max_possible > 0 else 0.0
 
     return FinalConsensusReport(
-        estimated_overall_score=round(total_score, 2),
-        max_possible_score=max_possible,
-        percentage=percentage,
+        raw_points=round(total_score, 2),
+        max_possible_points=max_possible,
+        overall_percentage=percentage,
         letter_grade=_letter_grade(percentage),
         deterministic_stats=stats,
         criteria_breakdown=criteria_breakdown,
         consensus_discrepancies=synthesis.get("consensus_discrepancies", []),
         top_strengths=synthesis.get("top_strengths", []),
-        priority_improvements=synthesis.get("priority_improvements", []),
+        priority_revisions=synthesis.get("priority_revisions", []),
         guiding_questions_for_revision=synthesis.get("guiding_questions_for_revision", []),
         agents_used=[r.agent_name for r in agent_results if not r.failed],
     )

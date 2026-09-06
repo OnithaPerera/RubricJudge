@@ -25,7 +25,7 @@ export default function RevisionChecklist({ report }: RevisionChecklistProps) {
   );
 
   const completedCount = checked.size;
-  const totalCount = report.priority_improvements.length;
+  const totalCount = report.priority_revisions.length;
   const completionPct =
     totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
@@ -56,7 +56,7 @@ export default function RevisionChecklist({ report }: RevisionChecklistProps) {
       </div>
 
       {/* Priority improvements */}
-      {report.priority_improvements.length > 0 && (
+      {report.priority_revisions.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp size={15} style={{ color: "var(--color-brand-400)" }} />
@@ -68,7 +68,7 @@ export default function RevisionChecklist({ report }: RevisionChecklistProps) {
             </span>
           </div>
           <div className="space-y-2">
-            {report.priority_improvements.map((improvement, i) => (
+            {report.priority_revisions.map((improvement, i) => (
               <button
                 key={i}
                 type="button"
@@ -110,7 +110,7 @@ export default function RevisionChecklist({ report }: RevisionChecklistProps) {
         </div>
         <div className="space-y-2">
           {sortedCriteria.map((c, i) => {
-            const gap = c.max_score - c.final_score;
+            const gap = c.max_score - c.assigned_score;
             return (
               <div
                 key={c.criterion_id}

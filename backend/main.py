@@ -22,7 +22,8 @@ from typing import AsyncIterator, Optional
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # Load .env file BEFORE any other imports that read os.environ
@@ -82,6 +83,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    if isinstance(exc.detail, dict) and "error_code" in exc.detail:
+        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error_code": "HTTP_ERROR", "message": str(exc.detail), "resolution": "Please verify your request parameters."}
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception: %s", exc)
+    return JSONResponse(
+        status_code=500,
+        content={"error_code": "INTERNAL_SERVER_ERROR", "message": str(exc), "resolution": "An unexpected error occurred. Please try again later."}
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -181,10 +200,19 @@ async def _run_pipeline(
     except Exception as exc:
         logger.exception("Pipeline error for job %s: %s", job_id, exc)
         await job_store.set_status(job_id, "failed")
+        
+        error_msg = str(exc)
+        if "429" in error_msg or "rate limit" in error_msg.lower() or "quota" in error_msg.lower() or "exhausted" in error_msg.lower():
+            error_msg = "Google GenAI API rate limit exceeded. Please wait a moment and try again."
+        elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+            error_msg = "Connection to the AI service timed out. The evaluation was too complex or the service is busy. Please try again."
+        elif "400" in error_msg or "safety" in error_msg.lower() or "blocked" in error_msg.lower():
+            error_msg = "The evaluation was blocked due to safety settings or unsupported content. Please revise your documents."
+            
         await _push_progress(
             job_id, "failed", 0,
-            f"Evaluation failed: {exc}",
-            error=str(exc),
+            f"Evaluation failed: {error_msg}",
+            error=error_msg,
         )
 
 
@@ -211,22 +239,32 @@ async def start_evaluation(
     resolved_draft = draft_text or ""
     if not resolved_draft and draft_file:
         content = await draft_file.read()
-        resolved_draft = extract_text_from_upload(draft_file.filename or "upload.txt", content)
+        if len(content) > 25 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail={"error_code": "FILE_TOO_LARGE", "message": "Draft file exceeds the 25MB limit.", "resolution": "Please upload a smaller file."})
+        try:
+            resolved_draft = extract_text_from_upload(draft_file.filename or "upload.txt", content)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail={"error_code": "INVALID_FILE", "message": str(e), "resolution": "Please ensure your file is a valid PDF, DOCX, or TXT."})
 
     # Resolve rubric text
     resolved_rubric = rubric_text or ""
     if not resolved_rubric and rubric_file:
         content = await rubric_file.read()
-        resolved_rubric = extract_text_from_upload(rubric_file.filename or "upload.txt", content)
+        if len(content) > 25 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail={"error_code": "FILE_TOO_LARGE", "message": "Rubric file exceeds the 25MB limit.", "resolution": "Please upload a smaller file."})
+        try:
+            resolved_rubric = extract_text_from_upload(rubric_file.filename or "upload.txt", content)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail={"error_code": "INVALID_FILE", "message": str(e), "resolution": "Please ensure your file is a valid PDF, DOCX, or TXT."})
 
     if not resolved_draft:
-        raise HTTPException(status_code=422, detail="Draft text or file is required.")
+        raise HTTPException(status_code=422, detail={"error_code": "MISSING_DRAFT", "message": "Draft text or file is required.", "resolution": "Please upload or paste your assignment draft."})
     if not resolved_rubric:
-        raise HTTPException(status_code=422, detail="Rubric text or file is required.")
+        raise HTTPException(status_code=422, detail={"error_code": "MISSING_RUBRIC", "message": "Rubric text or file is required.", "resolution": "Please upload or paste your evaluation rubric."})
     if len(resolved_draft.split()) < 30:
         raise HTTPException(
             status_code=422,
-            detail="Draft is too short (minimum 30 words). Please submit a more complete assignment draft.",
+            detail={"error_code": "DRAFT_TOO_SHORT", "message": "The uploaded document contains unreadable or scanned image text, or is too short.", "resolution": "Please upload a standard digital document or convert it to DOCX."}
         )
 
     job_id = await job_store.create_job()

@@ -1,5 +1,5 @@
 """
-RubricJudge — Deterministic Pre-Processor (Phase 1, non-LLM)
+RubricJudge - Deterministic Pre-Processor (Phase 1, non-LLM)
 
 Computes hard metrics from the draft text before any LLM is invoked:
 - Word count, paragraph count, sentence count

@@ -15,7 +15,7 @@ const PIPELINE_PHASES = [
   {
     stage: "parsing_rubric",
     label: "Rubric Parser",
-    sublabel: "Agent 0 — Normalising criteria",
+    sublabel: "Agent 0: Normalising criteria",
     color: "var(--accent-a)",
     bg: "hsla(186,85%,56%,0.12)",
   },
@@ -36,7 +36,7 @@ const PIPELINE_PHASES = [
   {
     stage: "arbitrating_discrepancies",
     label: "Consensus Engine",
-    sublabel: "Agent D — Reconciling variances",
+    sublabel: "Agent D: Reconciling variances",
     color: "var(--accent-c)",
     bg: "hsla(280,80%,68%,0.12)",
   },

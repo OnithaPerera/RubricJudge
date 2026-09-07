@@ -4,7 +4,7 @@
    Design Tokens
 ─────────────────────────────────────────────── */
 :root {
-  /* Brand Palette — Zinc/Slate */
+  /* Brand Palette - Zinc/Slate */
   --surface-0: #ffffff;    /* deepest bg */
   --surface-1: #f4f4f5;    /* card bg */
   --surface-2: #e4e4e7;    /* elevated card */
@@ -52,7 +52,7 @@
 }
 
 .dark {
-  /* Brand Palette — Zinc/Slate */
+  /* Brand Palette - Zinc/Slate */
   --surface-0: #09090b;    /* deepest bg */
   --surface-1: #18181b;    /* card bg */
   --surface-2: #27272a;    /* elevated card */

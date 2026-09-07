@@ -1,18 +1,24 @@
 import Link from "next/link";
+import { FileQuestion, ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center">
-      <h2 className="text-4xl font-bold font-display mb-4 text-zinc-900 dark:text-zinc-100">404 - Not Found</h2>
-      <p className="text-zinc-600 dark:text-zinc-400 mb-8 max-w-md">
-        Could not find requested resource. The page you are looking for might have been removed or is temporarily unavailable.
-      </p>
-      <Link 
-        href="/" 
-        className="px-6 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
-      >
-        Return to Dashboard
-      </Link>
+    <div className="min-h-[calc(100vh-65px)] flex flex-col items-center justify-center bg-background px-4">
+      <div className="max-w-md w-full text-center">
+        <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto mb-6">
+          <FileQuestion size={40} className="text-zinc-400" />
+        </div>
+        <h2 className="text-3xl font-black font-display text-foreground mb-4">
+          404: Page Not Found
+        </h2>
+        <p className="text-zinc-500 mb-8 leading-relaxed">
+          The requested evaluation report or document could not be located. It may have been discarded or the URL is incorrect.
+        </p>
+        <Link href="/" className="btn-primary inline-flex items-center gap-2">
+          <ArrowLeft size={16} />
+          Return to Dashboard
+        </Link>
+      </div>
     </div>
   );
 }

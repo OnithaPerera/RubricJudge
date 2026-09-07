@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, DragEvent, ChangeEvent } from "react";
-import { BookOpen, FileText, Upload, X, Zap, ChevronRight } from "lucide-react";
+import { BookOpen, FileText, Upload, X, Zap, ChevronRight, ShieldCheck } from "lucide-react";
 import { SAMPLE_DRAFT, SAMPLE_RUBRIC } from "@/lib/types";
 
 interface InputPanelProps {
@@ -30,7 +30,7 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
     const dFile = new File([SAMPLE_DRAFT], "sample_draft.txt", { type: "text/plain" });
     setRubricFile({ name: rFile.name, size: rFile.size, rawFile: rFile, text: SAMPLE_RUBRIC });
     setDraftFile({ name: dFile.name, size: dFile.size, rawFile: dFile, text: SAMPLE_DRAFT });
-    setAssignmentTitle("Critical Analysis Essay – Climate Change Policy");
+    setAssignmentTitle("Critical Analysis Essay: Climate Change Policy");
   };
 
   const hasRubric = Boolean(rubricFile);
@@ -85,22 +85,36 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="text-center mb-10 slide-up">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-4"
+      {/* Hero Header */}
+      <div className="text-center mb-8 slide-up">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"
           style={{ background: "hsla(248,87%,61%,0.12)", border: "1px solid hsla(248,87%,61%,0.3)" }}>
           <Zap size={14} style={{ color: "var(--color-brand-400)" }} />
           <span style={{ color: "var(--color-brand-400)", fontSize: 12, fontWeight: 600, letterSpacing: "0.08em" }}>
             MULTI-AGENT AI EVALUATION
           </span>
         </div>
-        <h1 className="text-5xl font-bold mb-4 gradient-text" style={{ fontFamily: "var(--font-display)" }}>
-          RubricJudge
+        <h1 className="text-4xl md:text-6xl font-black mb-6 tracking-tight text-foreground" style={{ fontFamily: "var(--font-display)" }}>
+          Know Your Grade Before You Submit.
         </h1>
-        <p style={{ color: "var(--text-secondary)", fontSize: 17, maxWidth: 560, margin: "0 auto" }}>
-          Submit your rubric and assignment draft. A committee of four specialist AI agents
-          will evaluate, debate, and produce a diagnostic report.
+        <p className="text-lg md:text-xl text-zinc-500 dark:text-zinc-400 max-w-3xl mx-auto mb-8">
+          Upload your assignment rubric and draft. A committee of specialized AI evaluators analyzes your work against exact marking criteria to give you calibrated score predictions and actionable revision steps.
         </p>
+
+        {/* Academic Integrity Seal */}
+        <div className="max-w-3xl mx-auto flex items-start gap-3 p-4 rounded-xl text-left bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
+          <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <ShieldCheck size={18} className="text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div>
+            <h3 className="font-bold text-emerald-900 dark:text-emerald-300 mb-1">
+              100% Academic Integrity Compliant.
+            </h3>
+            <p className="text-sm text-emerald-800 dark:text-emerald-400/80 leading-relaxed">
+              RubricJudge provides diagnostic guidance, rubric alignment, and revision checklists without ghostwriting or generating text for you.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Assignment title + sample button */}

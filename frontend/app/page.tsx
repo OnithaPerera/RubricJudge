@@ -11,6 +11,7 @@ import {
   PipelineStage,
   EvaluationJobResponse,
 } from "@/lib/types";
+import { Users, Target, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -173,10 +174,86 @@ export default function Home() {
 
         {/* State machine */}
         {appState === "idle" || appState === "submitting" || appState === "error" ? (
-          <InputPanel
-            onSubmit={handleSubmit}
-            isLoading={appState === "submitting"}
-          />
+          <div className="pb-24">
+            <InputPanel
+              onSubmit={handleSubmit}
+              isLoading={appState === "submitting"}
+            />
+            
+            {appState === "idle" && (
+              <>
+                {/* How It Works Section */}
+                <section id="how-it-works" className="max-w-6xl mx-auto px-4 py-16">
+                  <div className="text-center mb-12">
+                    <h2 className="text-3xl font-bold mb-4 font-display text-foreground">How It Works</h2>
+                    <p className="text-zinc-500 max-w-2xl mx-auto">
+                      A simple, transparent process to align your work with expectations.
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {/* Step 1 */}
+                    <div className="glass-card p-6 flex flex-col items-center text-center">
+                      <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4 text-blue-600 dark:text-blue-400">
+                        <Target size={24} />
+                      </div>
+                      <h3 className="text-lg font-bold mb-2">1. Drop Your Files</h3>
+                      <p className="text-sm text-zinc-500">
+                        Upload your assignment prompt (rubric) and your current draft. We support Canvas, Moodle, and Blackboard compatible .docx and .pdf files.
+                      </p>
+                    </div>
+
+                    {/* Step 2 */}
+                    <div className="glass-card p-6 flex flex-col items-center text-center relative">
+                      <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-4 text-indigo-600 dark:text-indigo-400">
+                        <Users size={24} />
+                      </div>
+                      <h3 className="text-lg font-bold mb-2">2. Multi-Agent Consensus</h3>
+                      <p className="text-sm text-zinc-500">
+                        Three specialized AI evaluators audit your work for rubric compliance, critical depth, and citation accuracy. They debate discrepancies to reach a consensus.
+                      </p>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div className="glass-card p-6 flex flex-col items-center text-center">
+                      <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4 text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 size={24} />
+                      </div>
+                      <h3 className="text-lg font-bold mb-2">3. Prioritized Revision</h3>
+                      <p className="text-sm text-zinc-500">
+                        Receive a calibrated score prediction, exact evidence citations, and a prioritized checklist of high-impact questions to guide your final revision.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                {/* FAQ Section */}
+                <section className="max-w-3xl mx-auto px-4 py-16">
+                  <div className="text-center mb-10">
+                    <h2 className="text-3xl font-bold mb-4 font-display text-foreground">Frequently Asked Questions</h2>
+                  </div>
+                  <div className="space-y-4">
+                    <FaqItem 
+                      question="Will my professor know I used this?" 
+                      answer="No. RubricJudge does not report to universities or save your papers to a database. It is a diagnostic tool, much like a grammar checker, designed to give you feedback before you submit." 
+                    />
+                    <FaqItem 
+                      question="Does this write the essay for me?" 
+                      answer="Absolutely not. We adhere strictly to academic integrity guidelines. RubricJudge only reads your text and the rubric to tell you where you missed the mark and what questions you should ask yourself to improve." 
+                    />
+                    <FaqItem 
+                      question="How accurate are the predicted grades?" 
+                      answer="The grades are estimates based on how explicitly your draft addresses the rubric criteria. The multi-agent consensus system is highly calibrated, but human markers may still have subjective preferences. Always use the score as a guide, not a guarantee." 
+                    />
+                    <FaqItem 
+                      question="What happens to my uploaded files?" 
+                      answer="Files are processed in memory for the duration of the evaluation and are immediately discarded. We do not store, retain, or train models on your uploaded documents." 
+                    />
+                  </div>
+                </section>
+              </>
+            )}
+          </div>
         ) : appState === "evaluating" ? (
           <AgentStatusTracker
             events={events}
@@ -189,5 +266,26 @@ export default function Home() {
         ) : null}
       </main>
     </>
+  );
+}
+
+function FaqItem({ question, answer }: { question: string; answer: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="glass-card rounded-xl overflow-hidden transition-all">
+      <button 
+        type="button"
+        onClick={() => setIsOpen(!isOpen)} 
+        className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+      >
+        <span className="font-bold text-foreground">{question}</span>
+        {isOpen ? <ChevronUp size={18} className="text-zinc-400" /> : <ChevronDown size={18} className="text-zinc-400" />}
+      </button>
+      {isOpen && (
+        <div className="px-6 pb-4 pt-2 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/20 text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
+          {answer}
+        </div>
+      )}
+    </div>
   );
 }

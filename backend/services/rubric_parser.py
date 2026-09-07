@@ -1,5 +1,5 @@
 """
-RubricJudge — Rubric Parser (Agent 0)
+RubricJudge - Rubric Parser (Agent 0)
 
 Converts unstructured rubric text (copied from a course portal, PDF, or
 table) into a NormalizedRubric JSON object using an LLM with strict
@@ -123,7 +123,7 @@ async def parse_rubric(
         return heuristic_result
 
     # 2) LLM-based parsing
-    logger.info("Rubric is complex — invoking LLM parser.")
+    logger.info("Rubric is complex: invoking LLM parser.")
 
     # Build the response schema from NormalizedRubric
     user_message = f"""

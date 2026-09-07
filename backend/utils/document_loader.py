@@ -1,5 +1,5 @@
 """
-RubricJudge — Document Loader
+RubricJudge - Document Loader
 Extracts plain text from PDF and DOCX uploads using pdfplumber (primary),
 pypdf (fallback), and python-docx.
 """
@@ -84,16 +84,27 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
 
 
 def extract_text_from_upload(filename: str, file_bytes: bytes) -> str:
-    """Route extraction by file extension."""
+    """Route extraction by file extension and validate content."""
     suffix = Path(filename).suffix.lower()
+    text = ""
     if suffix == ".pdf":
-        return extract_text_from_pdf(file_bytes)
+        text = extract_text_from_pdf(file_bytes)
     elif suffix in {".docx", ".doc"}:
-        return extract_text_from_docx(file_bytes)
+        text = extract_text_from_docx(file_bytes)
     elif suffix in {".txt", ".md"}:
-        return file_bytes.decode("utf-8", errors="replace")
+        text = file_bytes.decode("utf-8", errors="replace")
     else:
         raise ValueError(
             f"Unsupported file type: '{suffix}'. "
             "Please upload PDF, DOCX, or TXT files."
         )
+    
+    # Validation: Ensure extracted text is substantial
+    word_count = len(text.split())
+    if word_count < 30:
+        raise ValueError(
+            "The uploaded document contains unreadable or scanned image text, or is too short. "
+            "Please upload a standard digital document or convert it to DOCX."
+        )
+    
+    return text

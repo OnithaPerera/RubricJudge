@@ -18,12 +18,12 @@ import { ThemeProvider } from "@/components/theme-provider";
 import SiteHeader from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "RubricJudge — AI-Powered Assignment Evaluation",
+  title: "RubricJudge - AI-Powered Assignment Evaluation",
   description:
     "Submit your assignment draft and evaluation rubric to receive instant multi-agent AI diagnostic feedback with actionable revision advice.",
   keywords: ["assignment evaluation", "AI grading", "rubric feedback", "academic writing"],
   openGraph: {
-    title: "RubricJudge — AI-Powered Assignment Evaluation",
+    title: "RubricJudge - AI-Powered Assignment Evaluation",
     description: "Multi-agent AI evaluation committee for academic assignments.",
     type: "website",
   },

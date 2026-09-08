@@ -52,8 +52,49 @@ def get_ollama_model() -> str:
 def get_ollama_base_url() -> str:
     return os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 
-def get_llm_provider() -> str:
-    return os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+def get_groq_model() -> str:
+    return os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+def get_openrouter_model() -> str:
+    return os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+
+def get_llm_provider(agent_name: Optional[str] = None) -> str:
+    """
+    Route to different providers based on agent persona if multiple keys exist.
+    If only one provider key exists, fallback to it.
+    """
+    keys = {
+        "gemini": os.getenv("GEMINI_API_KEY"),
+        "groq": os.getenv("GROQ_API_KEY"),
+        "openrouter": os.getenv("OPENROUTER_API_KEY"),
+        "openai": os.getenv("OPENAI_API_KEY"),
+        "anthropic": os.getenv("ANTHROPIC_API_KEY"),
+    }
+    
+    available = [k for k, v in keys.items() if v]
+    
+    if not available:
+        return "gemini" # fallback default
+        
+    if len(available) == 1:
+        return available[0]
+        
+    # Multi-provider routing
+    if agent_name == "Agent A" and "gemini" in available:
+        return "gemini"
+    if agent_name == "Agent B":
+        if "groq" in available: return "groq"
+        if "anthropic" in available: return "anthropic"
+    if agent_name == "Agent C":
+        if "groq" in available: return "groq"
+        if "openrouter" in available: return "openrouter"
+        if "gemini" in available: return "gemini"
+    if agent_name == "Agent D":
+        if "openai" in available: return "openai"
+        if "anthropic" in available: return "anthropic"
+        if "gemini" in available: return "gemini"
+        
+    return available[0]
 
 def get_max_retries() -> int:
     return int(os.getenv("LLM_MAX_RETRIES", "3"))
@@ -235,10 +276,13 @@ async def _call_openai(
     response_schema: Optional[dict] = None,
     model: Optional[str] = None,
     temperature: float = 0.2,
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> str:
     from openai import AsyncOpenAI  # type: ignore
 
-    client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    client_api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+    client = AsyncOpenAI(api_key=client_api_key, base_url=base_url)
 
     kwargs: dict[str, Any] = dict(
         model=model or get_openai_model(),
@@ -331,6 +375,7 @@ async def llm_json_call(
     user_message: str,
     response_model: Type[T],
     temperature: float = 0.2,
+    agent_name: Optional[str] = None,
 ) -> T:
     """
     Make an async LLM call and parse the JSON response into `response_model`.
@@ -340,6 +385,7 @@ async def llm_json_call(
         user_message:  The per-request user message.
         response_model: A Pydantic BaseModel class to parse the response into.
         temperature:   Sampling temperature (default 0.2 for consistent evals).
+        agent_name:    Optional name of the agent, used for multi-provider routing.
 
     Returns:
         An instance of `response_model`.
@@ -347,7 +393,7 @@ async def llm_json_call(
     Raises:
         ValueError: If the LLM returns unparse-able JSON after all retries.
     """
-    provider = get_llm_provider()
+    provider = get_llm_provider(agent_name)
 
     async def _do_call() -> str:
         if provider == "gemini":
@@ -361,6 +407,28 @@ async def llm_json_call(
             return await _call_anthropic(system_prompt, user_message, temperature=temperature)
         elif provider == "ollama":
             return await _call_ollama(system_prompt, user_message, temperature=temperature)
+        elif provider == "groq":
+            schema = response_model.model_json_schema()
+            return await _call_openai(
+                system_prompt,
+                user_message,
+                response_schema=schema,
+                temperature=temperature,
+                base_url="https://api.groq.com/openai/v1",
+                api_key=os.environ.get("GROQ_API_KEY"),
+                model=get_groq_model(),
+            )
+        elif provider == "openrouter":
+            schema = response_model.model_json_schema()
+            return await _call_openai(
+                system_prompt,
+                user_message,
+                response_schema=schema,
+                temperature=temperature,
+                base_url="https://openrouter.ai/api/v1",
+                api_key=os.environ.get("OPENROUTER_API_KEY"),
+                model=get_openrouter_model(),
+            )
         else:
             schema = response_model.model_json_schema()
             return await _call_openai(
@@ -379,9 +447,10 @@ async def llm_text_call(
     system_prompt: str,
     user_message: str,
     temperature: float = 0.3,
+    agent_name: Optional[str] = None,
 ) -> str:
     """Plain-text (non-JSON) LLM call with retry."""
-    provider = get_llm_provider()
+    provider = get_llm_provider(agent_name)
 
     async def _do_call() -> str:
         if provider == "gemini":
@@ -390,17 +459,21 @@ async def llm_text_call(
             return await _call_anthropic(system_prompt, user_message, temperature=temperature)
         elif provider == "ollama":
             return await _call_ollama(system_prompt, user_message, temperature=temperature)
-        else:
-            from openai import AsyncOpenAI  # type: ignore
-            client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            response = await client.chat.completions.create(
-                model=get_openai_model(),
-                temperature=temperature,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
+        elif provider == "groq":
+            return await _call_openai(
+                system_prompt, user_message, temperature=temperature,
+                base_url="https://api.groq.com/openai/v1",
+                api_key=os.environ.get("GROQ_API_KEY"),
+                model=get_groq_model()
             )
-            return response.choices[0].message.content or ""
+        elif provider == "openrouter":
+            return await _call_openai(
+                system_prompt, user_message, temperature=temperature,
+                base_url="https://openrouter.ai/api/v1",
+                api_key=os.environ.get("OPENROUTER_API_KEY"),
+                model=get_openrouter_model()
+            )
+        else:
+            return await _call_openai(system_prompt, user_message, temperature=temperature)
 
     return await _with_retry(_do_call)

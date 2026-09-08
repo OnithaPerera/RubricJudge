@@ -137,7 +137,42 @@ export interface FinalConsensusReport {
   priority_revisions: string[];
   guiding_questions_for_revision: string[];
   agents_used: string[];
+  citation_audit: CitationAuditReport | null;
+  settings: EvaluationSettings | null;
   disclaimer: string;
+}
+
+// ---------------------------------------------------------------------------
+// Settings & Citations
+// ---------------------------------------------------------------------------
+
+export interface EvaluationSettings {
+  referencing_style: "APA 7th" | "Harvard" | "IEEE" | "MLA 9th" | "Chicago";
+  target_word_count: number | null;
+  academic_level: "Undergraduate (1st/2nd Year)" | "Undergraduate (Final Year)" | "Postgraduate / Masters";
+  strictness_level: "Lenient" | "Standard" | "Strict";
+  verify_dois: boolean;
+  check_citation_cross_references: boolean;
+}
+
+export interface CitationValidationItem {
+  raw_citation: string;
+  is_matched: boolean;
+  doi: string | null;
+  doi_valid: boolean | null;
+  doi_error_message: string | null;
+  formatting_critique: string;
+  suggested_format: string;
+}
+
+export interface CitationAuditReport {
+  referencing_style: string;
+  total_citations_found: number;
+  active_dois_verified: number;
+  broken_dois_found: number;
+  orphan_references: string[];
+  missing_in_text_citations: string[];
+  items: CitationValidationItem[];
 }
 
 // ---------------------------------------------------------------------------
@@ -269,6 +304,8 @@ export const SAMPLE_REPORT: FinalConsensusReport = {
   max_possible_points: 100,
   overall_percentage: 82.5,
   letter_grade: "B+",
+  citation_audit: null,
+  settings: null,
   deterministic_stats: {
     word_count: 520,
     paragraph_count: 6,

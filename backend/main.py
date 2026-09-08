@@ -35,9 +35,11 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from models import (
     EvaluationJobResponse,
+    EvaluationRequest,
     FinalConsensusReport,
     JobStatusResponse,
     StreamProgressEvent,
+    EvaluationSettings,
 )
 from services.evaluators import run_evaluation_pipeline
 from services.preprocessor import preprocess_draft
@@ -143,6 +145,7 @@ async def _run_pipeline(
     draft_text: str,
     rubric_text: str,
     assignment_title: Optional[str],
+    settings: Optional[EvaluationSettings] = None,
 ) -> None:
     """Full 4-phase pipeline executed as a background asyncio task."""
     try:
@@ -183,6 +186,8 @@ async def _run_pipeline(
             rubric=rubric,
             draft_text=draft_text,
             stats=stats,
+            job_id=job_id,
+            settings=settings,
             progress_callback=_progress_callback,
         )
 
@@ -226,6 +231,7 @@ async def start_evaluation(
     draft_text: Optional[str] = Form(None),
     rubric_text: Optional[str] = Form(None),
     assignment_title: Optional[str] = Form(None),
+    settings: Optional[str] = Form(None),
     draft_file: Optional[UploadFile] = File(None),
     rubric_file: Optional[UploadFile] = File(None),
 ) -> EvaluationJobResponse:
@@ -267,12 +273,19 @@ async def start_evaluation(
             detail={"error_code": "DRAFT_TOO_SHORT", "message": "The uploaded document contains unreadable or scanned image text, or is too short.", "resolution": "Please upload a standard digital document or convert it to DOCX."}
         )
 
+    parsed_settings = None
+    if settings:
+        try:
+            parsed_settings = EvaluationSettings.model_validate_json(settings)
+        except Exception as e:
+            logger.warning("Failed to parse settings: %s", e)
+
     job_id = await job_store.create_job()
     logger.info("Created job %s (%d word draft, %d char rubric).", job_id, len(resolved_draft.split()), len(resolved_rubric))
 
     # Launch evaluation as a monitored background task
     task = asyncio.create_task(
-        _run_pipeline(job_id, resolved_draft, resolved_rubric, assignment_title)
+        _run_pipeline(job_id, resolved_draft, resolved_rubric, assignment_title, parsed_settings)
     )
     job_store.register_task(job_id, task)
 

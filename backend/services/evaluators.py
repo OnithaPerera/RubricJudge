@@ -35,8 +35,11 @@ from models import (
     NormalizedRubric,
     RubricCriterion,
     verify_evidence_quotes,
+    EvaluationSettings,
+    CitationAuditReport,
 )
 from services.llm_client import llm_json_call, llm_text_call
+from services.citation_verifier import run_citation_audit
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +200,7 @@ Return JSON with: agent_name, overall_notes, criterion_scores[].
         user_message=user_msg,
         response_model=AgentEvaluationResult,
         temperature=0.2,
+        agent_name="Agent A",
     )
     # Clamp scores and filter ghostwriting
     for cs in result.criterion_scores:
@@ -255,6 +259,7 @@ Return JSON with: agent_name ("Agent B"), overall_notes, criterion_scores[].
         user_message=user_msg,
         response_model=AgentEvaluationResult,
         temperature=0.3,
+        agent_name="Agent B",
     )
     for cs in result.criterion_scores:
         crit = next((c for c in rubric.criteria if c.id == cs.criterion_id), None)
@@ -311,6 +316,7 @@ Return JSON with: agent_name ("Agent C"), overall_notes, criterion_scores[].
         user_message=user_msg,
         response_model=AgentEvaluationResult,
         temperature=0.2,
+        agent_name="Agent C",
     )
     for cs in result.criterion_scores:
         crit = next((c for c in rubric.criteria if c.id == cs.criterion_id), None)
@@ -426,6 +432,7 @@ Deliver the authoritative reconciled score.
             user_message=user_msg,
             response_model=_ArbitrationResult,
             temperature=0.1,
+            agent_name="Agent D",
         )
         clamped = max(0.0, min(arb.reconciled_score, criterion.max_score))
         return clamped, arb.arbitration_reasoning, _filter_suggestions(arb.revision_prompts)
@@ -521,6 +528,7 @@ Synthesise the top strengths, improvements, and guiding questions.
             user_message=user_msg,
             response_model=_SynthesisResult,
             temperature=0.3,
+            agent_name="Agent D",
         )
         return {
             "top_strengths": result.top_strengths[:5],
@@ -560,6 +568,8 @@ async def run_evaluation_pipeline(
     rubric: NormalizedRubric,
     draft_text: str,
     stats: DeterministicStats,
+    job_id: str,
+    settings: Optional[EvaluationSettings] = None,
     progress_callback=None,
 ) -> FinalConsensusReport:
     """
@@ -569,6 +579,8 @@ async def run_evaluation_pipeline(
         rubric:             Parsed and normalised rubric.
         draft_text:         Full submission text.
         stats:              Pre-computed deterministic metrics.
+        job_id:             Unique identifier for the evaluation job.
+        settings:           Optional settings for evaluation parameters.
         progress_callback:  Optional async callable(stage, message, agent=None)
                             invoked as phases complete.
 
@@ -589,11 +601,24 @@ async def run_evaluation_pipeline(
         run_agent_b(rubric, draft_text),
         run_agent_c(rubric, draft_text),
     ]
+    
+    if settings:
+        agent_coroutines.append(run_citation_audit(draft_text, settings))
+        
     raw_results = await asyncio.gather(*agent_coroutines, return_exceptions=True)
 
     agent_results: List[AgentEvaluationResult] = []
     agent_names = ["Agent A", "Agent B", "Agent C"]
+    citation_audit_report = None
+    
     for idx, res in enumerate(raw_results):
+        if idx >= len(agent_names):
+            if isinstance(res, Exception):
+                logger.error("Citation Auditor raised an exception: %s", res)
+            elif isinstance(res, CitationAuditReport):
+                citation_audit_report = res
+            continue
+            
         if isinstance(res, Exception):
             logger.error("Agent %s raised an exception: %s", agent_names[idx], res)
             agent_results.append(
@@ -726,15 +751,17 @@ async def run_evaluation_pipeline(
         )
     )
 
-    graded = [c for c in rubric.criteria if c.max_score > 0 and c.weight_percentage > 0]
-    total_weight = sum(c.weight_percentage for c in graded)
+    graded = [c for c in criteria_breakdown if not c.is_advisory]
+    total_weight = sum(next((r.weight_percentage for r in rubric.criteria if r.id == c.criterion_id), 0) for c in graded)
+    
     if total_weight > 0:
         overall_percentage = sum(
-            (next((rc.assigned_score for rc in criteria_breakdown if rc.criterion_id == c.id), 0.0) / c.max_score) * c.weight_percentage
+            (c.assigned_score / c.max_score) * next((r.weight_percentage for r in rubric.criteria if r.id == c.criterion_id), 0)
             for c in graded
         ) / total_weight * 100.0
     else:
-        overall_percentage = 0.0
+        overall_percentage = (sum(c.assigned_score for c in graded) / sum(c.max_score for c in graded)) * 100.0 if graded else 0.0
+        
     percentage = round(overall_percentage, 1)
 
     total_score = sum(rc.assigned_score for rc in criteria_breakdown if not rc.is_advisory)
@@ -751,5 +778,7 @@ async def run_evaluation_pipeline(
         top_strengths=synthesis.get("top_strengths", []),
         priority_revisions=synthesis.get("priority_revisions", []),
         guiding_questions_for_revision=synthesis.get("guiding_questions_for_revision", []),
-        agents_used=[r.agent_name for r in agent_results if not r.failed],
+        agents_used=[r.agent_name for r in active_agents] + (["Citation Auditor"] if citation_audit_report else []),
+        citation_audit=citation_audit_report,
+        settings=settings,
     )

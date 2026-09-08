@@ -17,6 +17,7 @@ import { FinalConsensusReport, EvidenceQuote } from "@/lib/types";
 import CriterionCard from "./CriterionCard";
 import RadarChart from "./RadarChart";
 import RevisionChecklist from "./RevisionChecklist";
+import CitationAuditView from "./CitationAuditView";
 
 interface ResultsDashboardProps {
   report: FinalConsensusReport;
@@ -24,7 +25,7 @@ interface ResultsDashboardProps {
   draftText?: string;
 }
 
-type TabId = "overview" | "criteria" | "revision";
+type TabId = "overview" | "criteria" | "revision" | "citations";
 
 function getGradeStyle(grade: string, percentage: number): { bg: string; color: string } {
   if (percentage >= 75) return { bg: "hsla(142,70%,48%,0.2)", color: "var(--color-success)" };
@@ -221,6 +222,12 @@ export default function ResultsDashboard({ report, onReset }: ResultsDashboardPr
             onClick={() => setActiveTab("revision")}>
             Revision Plan
           </button>
+          {report.citation_audit && (
+            <button type="button" className={`tab-item ${activeTab === "citations" ? "active" : ""}`}
+              onClick={() => setActiveTab("citations")}>
+              <FileText size={13} className="inline mr-1" />Citations & Sources
+            </button>
+          )}
         </div>
 
         {/* Tab content */}
@@ -269,6 +276,12 @@ export default function ResultsDashboard({ report, onReset }: ResultsDashboardPr
         {activeTab === "revision" && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 print:block">
             <RevisionChecklist report={report} />
+          </div>
+        )}
+
+        {activeTab === "citations" && report.citation_audit && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 print:block">
+            <CitationAuditView audit={report.citation_audit} />
           </div>
         )}
       </div>

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useRef, DragEvent, ChangeEvent } from "react";
-import { BookOpen, FileText, Upload, X, Zap, ChevronRight, ShieldCheck } from "lucide-react";
-import { SAMPLE_DRAFT, SAMPLE_RUBRIC } from "@/lib/types";
+import { BookOpen, FileText, Upload, X, Zap, ChevronRight, ShieldCheck, Settings2, ChevronDown, ChevronUp } from "lucide-react";
+import { SAMPLE_DRAFT, SAMPLE_RUBRIC, EvaluationSettings } from "@/lib/types";
 
 interface InputPanelProps {
-  onSubmit: (draftText: string, rubricText: string, assignmentTitle: string, draftFile?: File | null, rubricFile?: File | null) => void;
+  onSubmit: (draftText: string, rubricText: string, assignmentTitle: string, settings: EvaluationSettings, draftFile?: File | null, rubricFile?: File | null) => void;
   isLoading: boolean;
 }
 
@@ -24,6 +24,15 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
   const [draftDragging, setDraftDragging] = useState(false);
   const rubricInputRef = useRef<HTMLInputElement>(null);
   const draftInputRef = useRef<HTMLInputElement>(null);
+
+  // Advanced Settings State
+  const [referencingStyle, setReferencingStyle] = useState<EvaluationSettings["referencing_style"]>("APA 7th");
+  const [targetWordCount, setTargetWordCount] = useState<number | "">("");
+  const [academicLevel, setAcademicLevel] = useState<EvaluationSettings["academic_level"]>("Undergraduate (Final Year)");
+  const [strictnessLevel, setStrictnessLevel] = useState<EvaluationSettings["strictness_level"]>("Standard");
+  const [verifyDois, setVerifyDois] = useState(true);
+  const [checkCitationCrossReferences, setCheckCitationCrossReferences] = useState(true);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   const loadSample = () => {
     const rFile = new File([SAMPLE_RUBRIC], "sample_rubric.txt", { type: "text/plain" });
@@ -74,10 +83,21 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
+    
+    const settings: EvaluationSettings = {
+      referencing_style: referencingStyle,
+      target_word_count: targetWordCount ? Number(targetWordCount) : null,
+      academic_level: academicLevel,
+      strictness_level: strictnessLevel,
+      verify_dois: verifyDois,
+      check_citation_cross_references: checkCitationCrossReferences,
+    };
+    
     onSubmit(
       draftFile?.text || "",
       rubricFile?.text || "",
       assignmentTitle,
+      settings,
       draftFile?.rawFile,
       rubricFile?.rawFile
     );
@@ -248,6 +268,104 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
             </span>
           </div>
         </div>
+      </div>
+
+      {/* Advanced Settings Accordion */}
+      <div className="mb-8 slide-up slide-up-delay-3">
+        <button
+          type="button"
+          onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+          className="flex items-center gap-2 text-sm font-semibold text-zinc-600 dark:text-zinc-300 mx-auto hover:text-foreground transition-colors"
+        >
+          <Settings2 size={16} />
+          Advanced Evaluation Settings
+          {showAdvancedSettings ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+
+        {showAdvancedSettings && (
+          <div className="mt-4 p-5 rounded-xl border border-border bg-card shadow-sm animate-in fade-in slide-in-from-top-2 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-foreground">Referencing Style</label>
+                <select 
+                  className="rj-textarea" 
+                  style={{ height: 40, paddingTop: 8 }}
+                  value={referencingStyle}
+                  onChange={(e) => setReferencingStyle(e.target.value as any)}
+                >
+                  <option value="APA 7th">APA 7th</option>
+                  <option value="Harvard">Harvard</option>
+                  <option value="IEEE">IEEE</option>
+                  <option value="MLA 9th">MLA 9th</option>
+                  <option value="Chicago">Chicago</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-foreground">Target Word Count (Optional)</label>
+                <input 
+                  type="number"
+                  placeholder="e.g. 2000"
+                  className="rj-textarea"
+                  style={{ height: 40, paddingTop: 8 }}
+                  value={targetWordCount}
+                  onChange={(e) => setTargetWordCount(e.target.value ? Number(e.target.value) : "")}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-foreground">Academic Level</label>
+                <select 
+                  className="rj-textarea" 
+                  style={{ height: 40, paddingTop: 8 }}
+                  value={academicLevel}
+                  onChange={(e) => setAcademicLevel(e.target.value as any)}
+                >
+                  <option value="Undergraduate (1st/2nd Year)">Undergraduate (1st/2nd Year)</option>
+                  <option value="Undergraduate (Final Year)">Undergraduate (Final Year)</option>
+                  <option value="Postgraduate / Masters">Postgraduate / Masters</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-foreground">Marking Strictness</label>
+                <select 
+                  className="rj-textarea" 
+                  style={{ height: 40, paddingTop: 8 }}
+                  value={strictnessLevel}
+                  onChange={(e) => setStrictnessLevel(e.target.value as any)}
+                >
+                  <option value="Lenient">Lenient / Formative</option>
+                  <option value="Standard">Standard Balanced</option>
+                  <option value="Strict">Strict Examiner</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-3 md:col-span-2 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={verifyDois} 
+                    onChange={(e) => setVerifyDois(e.target.checked)}
+                    className="rounded border-zinc-300 text-brand-500 focus:ring-brand-500"
+                  />
+                  <span className="text-sm text-foreground">Live Crossref DOI Verification</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={checkCitationCrossReferences} 
+                    onChange={(e) => setCheckCitationCrossReferences(e.target.checked)}
+                    className="rounded border-zinc-300 text-brand-500 focus:ring-brand-500"
+                  />
+                  <span className="text-sm text-foreground">In-Text Reference Cross-Check (Orphan / Missing Analysis)</span>
+                </label>
+              </div>
+
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Submit */}

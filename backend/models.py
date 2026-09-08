@@ -14,6 +14,19 @@ from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
+# Settings & Settings
+# ---------------------------------------------------------------------------
+
+class EvaluationSettings(BaseModel):
+    referencing_style: Literal["APA 7th", "Harvard", "IEEE", "MLA 9th", "Chicago"] = "APA 7th"
+    target_word_count: Optional[int] = Field(default=None, ge=50, le=20000)
+    academic_level: Literal["Undergraduate (1st/2nd Year)", "Undergraduate (Final Year)", "Postgraduate / Masters"] = "Undergraduate (Final Year)"
+    strictness_level: Literal["Lenient", "Standard", "Strict"] = "Standard"
+    verify_dois: bool = True
+    check_citation_cross_references: bool = True
+
+
+# ---------------------------------------------------------------------------
 # Rubric Structures
 # ---------------------------------------------------------------------------
 
@@ -177,6 +190,30 @@ class CriterionEvaluation(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Citation Audits
+# ---------------------------------------------------------------------------
+
+class CitationValidationItem(BaseModel):
+    raw_citation: str
+    is_matched: bool
+    doi: Optional[str] = None
+    doi_valid: Optional[bool] = None
+    doi_error_message: Optional[str] = None
+    formatting_critique: str
+    suggested_format: str
+
+
+class CitationAuditReport(BaseModel):
+    referencing_style: str
+    total_citations_found: int
+    active_dois_verified: int
+    broken_dois_found: int
+    orphan_references: List[str]
+    missing_in_text_citations: List[str]
+    items: List[CitationValidationItem]
+
+
+# ---------------------------------------------------------------------------
 # Final Report (Phase 1 Refactor)
 # ---------------------------------------------------------------------------
 
@@ -199,6 +236,8 @@ class FinalConsensusReport(BaseModel):
     priority_revisions: List[str] = Field(default_factory=list)
     guiding_questions_for_revision: List[str] = Field(default_factory=list)
     agents_used: List[str] = Field(default_factory=list)
+    citation_audit: Optional[CitationAuditReport] = None
+    settings: Optional[EvaluationSettings] = None
     disclaimer: str = (
         "This is a diagnostic estimate only. "
         "Scores are AI-generated and do not constitute official academic assessment."
@@ -241,6 +280,7 @@ class EvaluationRequest(BaseModel):
     draft_text: str = Field(min_length=50)
     rubric_text: str = Field(min_length=20)
     assignment_title: Optional[str] = None
+    settings: Optional[EvaluationSettings] = None
 
 
 class EvaluationJobResponse(BaseModel):

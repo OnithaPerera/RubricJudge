@@ -51,6 +51,7 @@ export default function Home() {
       draft: string,
       rubric: string,
       title: string,
+      settings: import("@/lib/types").EvaluationSettings,
       draftFile?: File | null,
       rubricFile?: File | null
     ) => {
@@ -70,6 +71,7 @@ export default function Home() {
         if (draft) formData.append("draft_text", draft);
         if (rubric) formData.append("rubric_text", rubric);
         if (title) formData.append("assignment_title", title);
+        formData.append("settings", JSON.stringify(settings));
         if (draftFile) formData.append("draft_file", draftFile);
         if (rubricFile) formData.append("rubric_file", rubricFile);
 

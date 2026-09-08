@@ -22,15 +22,6 @@ export default function SiteHeader() {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <a href="#how-it-works" className="text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors hidden sm:block">
-          How It Works
-        </a>
-        <a href="#academic-integrity" className="text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors hidden sm:block">
-          Academic Integrity
-        </a>
-        <a href="#faq" className="text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors hidden sm:block">
-          FAQ
-        </a>
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           className="p-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"

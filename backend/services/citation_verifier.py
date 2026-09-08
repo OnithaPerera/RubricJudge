@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import urllib.parse
 from typing import List, Optional
 
 import httpx
@@ -12,14 +13,18 @@ logger = logging.getLogger(__name__)
 # Regex to extract DOI: matches 10.xxxx/xxxx...
 DOI_PATTERN = re.compile(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", re.IGNORECASE)
 
-async def _verify_doi(doi: str) -> bool:
+async def _verify_doi(doi: str, semaphore: asyncio.Semaphore) -> bool:
     """Check if a DOI is active using the Crossref API."""
-    url = f"https://api.crossref.org/works/{doi}"
-    headers = {"User-Agent": "RubricJudge-Audit/1.0 (mailto:support@rubricjudge.app)"}
+    safe_doi = urllib.parse.quote(doi.strip(), safe="")
+    url = f"https://api.crossref.org/works/{safe_doi}"
+    headers = {
+        "User-Agent": "RubricJudge/1.0 (https://rubricjudge.app; mailto:support@rubricjudge.app)"
+    }
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url, headers=headers)
-            return response.status_code == 200
+        async with semaphore:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url, headers=headers)
+                return response.status_code == 200
     except Exception as e:
         logger.warning(f"Error verifying DOI {doi}: {e}")
         return False
@@ -30,15 +35,17 @@ async def run_citation_audit(draft_text: str, settings: EvaluationSettings) -> C
     """
     logger.info("Starting citation audit...")
     
-    # Extract DOIs
-    extracted_dois = list(set(DOI_PATTERN.findall(draft_text)))
+    # Extract DOIs and strip trailing punctuation like periods or commas
+    raw_dois = DOI_PATTERN.findall(draft_text)
+    extracted_dois = list(set([doi.rstrip(".,;:?") for doi in raw_dois]))
     active_dois_verified = 0
     broken_dois_found = 0
     doi_statuses = {}
     
     if settings.verify_dois and extracted_dois:
         logger.info(f"Verifying {len(extracted_dois)} DOIs...")
-        tasks = [_verify_doi(doi) for doi in extracted_dois]
+        semaphore = asyncio.Semaphore(5)
+        tasks = [_verify_doi(doi, semaphore) for doi in extracted_dois]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         for doi, is_active in zip(extracted_dois, results):

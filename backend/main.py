@@ -29,6 +29,9 @@ from fastapi.middleware.cors import CORSMiddleware
 # Load .env file BEFORE any other imports that read os.environ
 load_dotenv()
 from fastapi.responses import StreamingResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # Add backend dir to path so relative imports work when run from project root
 sys.path.insert(0, os.path.dirname(__file__))
@@ -73,6 +76,10 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -226,7 +233,9 @@ async def _run_pipeline(
 # ---------------------------------------------------------------------------
 
 @app.post("/api/evaluate", response_model=EvaluationJobResponse, status_code=202)
+@limiter.limit("5/minute")
 async def start_evaluation(
+    request: Request,
     background_tasks: BackgroundTasks,
     draft_text: Optional[str] = Form(None),
     rubric_text: Optional[str] = Form(None),

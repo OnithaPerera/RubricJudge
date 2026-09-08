@@ -28,6 +28,8 @@ aiosqlite>=0.20.0
 
 # Utilities
 python-dotenv>=1.0.0         # Load .env files
+slowapi>=0.1.9               # Rate limiting
+httpx>=0.27.0                # Async HTTP client
 
 # Optional: Local model fallback (no install needed - Ollama exposes OpenAI API)
 # ollama                     # Only if you want the native Ollama Python SDK

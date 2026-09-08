@@ -32,3 +32,15 @@ def test_get_job_status_not_found():
         response = client.get("/api/jobs/invalid-job-id/status")
         assert response.status_code == 404
         assert "not found" in response.text
+
+def test_rate_limit():
+    with TestClient(app) as client:
+        # slowapi limit is 5/minute. Let's do 6 requests.
+        responses = []
+        for _ in range(6):
+            responses.append(client.post("/api/evaluate", data={"draft_text": "Sample Draft " * 20, "rubric_text": "Sample Rubric"}))
+        
+        # The 6th request should be 429 Too Many Requests
+        assert responses[-1].status_code == 429
+        assert "Rate limit exceeded" in responses[-1].text or "429" in str(responses[-1].status_code)
+

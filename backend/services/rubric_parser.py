@@ -113,6 +113,7 @@ async def parse_rubric(
     """
     # Guard against prompt injection via rubric text
     sanitised = rubric_text.replace("</rubric_input>", "[FILTERED]")
+    sanitised = sanitised.replace("<rubric_input>", "[FILTERED]")
 
     # 1) Heuristic fast-path
     heuristic_result = _heuristic_parse(sanitised)

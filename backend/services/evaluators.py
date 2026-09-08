@@ -118,7 +118,9 @@ def _rubric_summary(rubric: NormalizedRubric) -> str:
                 levels_str = str(c.levels)
             lines.append(f"         Levels: {levels_str}")
 
-    return "\n".join(lines)
+    summary = "\n".join(lines)
+    summary = summary.replace("</rubric_spec>", "[FILTERED]").replace("<rubric_spec>", "[FILTERED]")
+    return summary
 
 
 def _make_criterion_scores_schema() -> dict:
@@ -180,7 +182,8 @@ async def run_agent_a(
 ) -> AgentEvaluationResult:
     """Rubric Alignment Judge -- strict criterion-by-criterion G-Eval."""
     rubric_str = _rubric_summary(rubric)
-    sanitised_draft = draft_text.replace("</student_submission>", "[FILTERED]")
+    sanitised_draft = draft_text.replace("</student_submission>", "[FILTERED]").replace("<student_submission>", "[FILTERED]")
+    sanitised_draft = sanitised_draft.replace("</rubric_spec>", "[FILTERED]").replace("<rubric_spec>", "[FILTERED]")
 
     user_msg = f"""
 <rubric_spec>
@@ -238,7 +241,8 @@ async def run_agent_b(
 ) -> AgentEvaluationResult:
     """Critical Reasoning & Depth Judge -- devil's advocate."""
     rubric_str = _rubric_summary(rubric)
-    sanitised_draft = draft_text.replace("</student_submission>", "[FILTERED]")
+    sanitised_draft = draft_text.replace("</student_submission>", "[FILTERED]").replace("<student_submission>", "[FILTERED]")
+    sanitised_draft = sanitised_draft.replace("</rubric_spec>", "[FILTERED]").replace("<rubric_spec>", "[FILTERED]")
 
     user_msg = f"""
 <rubric_spec>
@@ -296,7 +300,8 @@ async def run_agent_c(
 ) -> AgentEvaluationResult:
     """Style, Structure & Citations Auditor."""
     rubric_str = _rubric_summary(rubric)
-    sanitised_draft = draft_text.replace("</student_submission>", "[FILTERED]")
+    sanitised_draft = draft_text.replace("</student_submission>", "[FILTERED]").replace("<student_submission>", "[FILTERED]")
+    sanitised_draft = sanitised_draft.replace("</rubric_spec>", "[FILTERED]").replace("<rubric_spec>", "[FILTERED]")
 
     user_msg = f"""
 <rubric_spec>
@@ -764,8 +769,8 @@ async def run_evaluation_pipeline(
         
     percentage = round(overall_percentage, 1)
 
-    total_score = sum(rc.assigned_score for rc in criteria_breakdown if not rc.is_advisory)
-    max_possible = sum(rc.max_score for rc in criteria_breakdown if not rc.is_advisory)
+    max_possible = rubric.total_points
+    total_score = (overall_percentage / 100.0) * max_possible
 
     return FinalConsensusReport(
         raw_points=round(total_score, 2),

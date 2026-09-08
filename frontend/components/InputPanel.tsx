@@ -120,45 +120,35 @@ export default function InputPanel({ onSubmit, isLoading }: InputPanelProps) {
         <p className="text-lg md:text-xl text-zinc-500 dark:text-zinc-400 max-w-3xl mx-auto mb-8">
           Upload your assignment rubric and draft. A committee of specialized AI evaluators analyzes your work against exact marking criteria to give you calibrated score predictions and actionable revision steps.
         </p>
+      </div>
 
-        {/* Academic Integrity Seal */}
-        <div className="max-w-3xl mx-auto flex items-start gap-3 p-4 rounded-xl text-left bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
-          <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <ShieldCheck size={18} className="text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div>
-            <h3 className="font-bold text-emerald-900 dark:text-emerald-300 mb-1">
-              100% Academic Integrity Compliant.
-            </h3>
-            <p className="text-sm text-emerald-800 dark:text-emerald-400/80 leading-relaxed">
-              RubricJudge provides diagnostic guidance, rubric alignment, and revision checklists without ghostwriting or generating text for you.
-            </p>
-          </div>
+      {/* 3-Step Instructions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 slide-up slide-up-delay-1 max-w-4xl mx-auto">
+        <div className="glass-card p-4 flex flex-col items-center text-center">
+          <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 font-bold flex items-center justify-center mb-2">1</div>
+          <h3 className="font-bold text-sm mb-1">Upload Rubric</h3>
+          <p className="text-xs text-zinc-500">Drag and drop your marking criteria in PDF or DOCX format.</p>
+        </div>
+        <div className="glass-card p-4 flex flex-col items-center text-center">
+          <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 font-bold flex items-center justify-center mb-2">2</div>
+          <h3 className="font-bold text-sm mb-1">Upload Draft</h3>
+          <p className="text-xs text-zinc-500">Upload your current assignment draft in PDF or DOCX format.</p>
+        </div>
+        <div className="glass-card p-4 flex flex-col items-center text-center">
+          <div className="w-8 h-8 rounded-full bg-brand-500/10 text-brand-500 font-bold flex items-center justify-center mb-2">3</div>
+          <h3 className="font-bold text-sm mb-1">Run Diagnostic</h3>
+          <p className="text-xs text-zinc-500">Customize referencing style or target word count in Advanced Settings.</p>
         </div>
       </div>
 
-      {/* Assignment title + sample button */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6 slide-up slide-up-delay-1">
-        <div className="flex-1 w-full">
-          <input
-            type="text"
-            value={assignmentTitle}
-            onChange={(e) => setAssignmentTitle(e.target.value)}
-            placeholder="Assignment title (optional)"
-            className="rj-textarea"
-            style={{ height: "44px", resize: "none", paddingTop: "10px", paddingBottom: "10px" }}
-          />
-        </div>
-        <button type="button" onClick={loadSample} className="btn-ghost whitespace-nowrap flex-shrink-0">
-          <BookOpen size={14} />
-          Load Sample
+      <div className="flex justify-end mb-4 max-w-5xl mx-auto slide-up slide-up-delay-1">
+        <button type="button" onClick={loadSample} className="btn-ghost whitespace-nowrap text-xs">
+          <BookOpen size={14} className="inline mr-1" /> Load Sample Files
         </button>
       </div>
 
-
-
       {/* Two-column input */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8 slide-up slide-up-delay-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8 slide-up slide-up-delay-2 max-w-5xl mx-auto">
 
         {/* Rubric Panel */}
         <div className="glass-card p-5 flex flex-col gap-3">

@@ -303,7 +303,7 @@ export const SAMPLE_REPORT: FinalConsensusReport = {
   raw_points: 82.5,
   max_possible_points: 100,
   overall_percentage: 82.5,
-  letter_grade: "B+",
+  letter_grade: "D",
   citation_audit: null,
   settings: null,
   deterministic_stats: {
